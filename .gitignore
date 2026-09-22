@@ -1,5 +1,5 @@
 mwa_asvo_api.key
-db/GLEAM-X.sqlite
+db/*.sqlite
 db/database_configuration.py
 queue/*
 */*pyc
@@ -10,7 +10,7 @@ data/*
 *.txt
 *.ipynb
 *.json
-SEA-setonix.profile
+./SEA-pipe-setonix.profile
 script_setonix/*
 log_setonix/*
 old_logs/*
