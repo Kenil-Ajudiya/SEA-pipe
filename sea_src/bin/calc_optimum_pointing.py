@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from gleam_x.bin.beam_value_at_radec import beam_value, parse_metafits
+from sea_src.bin.beam_value_at_radec import beam_value, parse_metafits
 
 from astropy.io import fits
 from astropy.coordinates import SkyCoord

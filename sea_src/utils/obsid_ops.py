@@ -13,7 +13,7 @@ from astropy.coordinates import SkyCoord
 from astropy.stats.circstats import circmean
 
 try:
-    from gleam_x.db import mysql_db as gxdb
+    from sea_src.db import mysql_db as gxdb
 except:
     gxdb = None
 

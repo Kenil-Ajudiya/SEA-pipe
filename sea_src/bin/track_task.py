@@ -10,7 +10,7 @@ if "GXTRACK" not in os.environ.keys() or os.environ["GXTRACK"] != "track":
     print("Task process tracking is disabled. ")
     sys.exit(0)
 
-import gleam_x.db.mysql_db as mdb
+import sea_src.db.mysql_db as mdb
 
 # This is the list of acceptable observation status' that are 'hard coded' in the
 # gleam-x website data/ui models.
@@ -393,4 +393,3 @@ if __name__ == "__main__":
         print(
             "I don't know what you are asking; please include a queue/start/finish/fail directive"
         )
-

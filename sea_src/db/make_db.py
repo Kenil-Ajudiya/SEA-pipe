@@ -1,6 +1,6 @@
 #! python
 from __future__ import print_function
-from  gleam_x.db import mysql_db as mdb
+from  sea_src.db import mysql_db as mdb
 import sys
 
 __author__ = ['Paul Hancock', 

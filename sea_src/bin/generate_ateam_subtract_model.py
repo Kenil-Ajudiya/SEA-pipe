@@ -14,8 +14,8 @@ from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 from astropy.time import Time
 from astropy.table import Table
 from mwa_pb_lookup.lookup_beam import beam_lookup_1d as gleamx_beam_lookup
-from gleam_x.bin.beam_value_at_radec import parse_metafits, beam_value
-from gleam_x.db.check_src_fov import check_coords
+from sea_src.bin.beam_value_at_radec import parse_metafits, beam_value
+from sea_src.db.check_src_fov import check_coords
 
 # TODO: Move to a proper GLEAM-X location
 # MWA location from CONV2UVFITS/convutils.h
@@ -688,4 +688,3 @@ if __name__ == "__main__":
         if result is not None:
             if args.mode == "count":
                 print(f"{metafits} {result}")
-

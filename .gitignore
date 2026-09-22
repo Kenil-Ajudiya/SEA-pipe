@@ -10,7 +10,7 @@ data/*
 *.txt
 *.ipynb
 *.json
-./SEA-pipe-setonix.profile
+SEA-pipe-setonix.profile
 script_setonix/*
 log_setonix/*
 old_logs/*

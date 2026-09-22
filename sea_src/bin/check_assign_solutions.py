@@ -29,7 +29,7 @@ logging.basicConfig(format="%(module)s:%(levelname)s:%(lineno)d %(message)s")
 logger.setLevel(logging.INFO)
 
 try:
-    from gleam_x.db import mysql_db as gxdb
+    from sea_src.db import mysql_db as gxdb
 except:
     print("Warning: unable to import the database connection")
     gxdb = None
@@ -498,4 +498,3 @@ if __name__ == "__main__":
     else:
         print("Invalid directive supplied. ")
         parser.print_help()
-

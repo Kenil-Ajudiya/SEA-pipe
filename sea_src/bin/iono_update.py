@@ -4,7 +4,7 @@ import sys
 import os
 import numpy as np
 import argparse
-import gleam_x.db.mysql_db as mdb
+import sea_src.db.mysql_db as mdb
 
 __author__ = ["Natasha Hurley-Walker", "Tim Galvin"]
 __date__ = "25/09/2018"
