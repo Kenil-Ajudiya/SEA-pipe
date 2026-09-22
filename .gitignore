@@ -10,7 +10,7 @@ data/*
 *.txt
 *.ipynb
 *.json
-GLEAM-X-pipeline-setonix.profile
+SEA-setonix.profile
 script_setonix/*
 log_setonix/*
 old_logs/*
