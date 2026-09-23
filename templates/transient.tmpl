@@ -39,7 +39,7 @@ function test_fail {
 base=BASEDIR
 debug=DEBUG
 # Which data column to image
-if [[ ! -z $debug ]]; then
+if [[ -n $debug ]]; then
     datacolumn="CORRECTED_DATA"
 else
     datacolumn="DATA"

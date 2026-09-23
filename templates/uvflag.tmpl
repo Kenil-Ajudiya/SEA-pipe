@@ -4,8 +4,7 @@ pipeuser=PIPEUSER
 obsnum=OBSNUM
 
 # If obsnum is a file, then we are in an array job
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
     taskid=${SLURM_ARRAY_TASK_ID}
     jobid=${SLURM_ARRAY_JOB_ID}
 
@@ -24,8 +23,7 @@ datadir=DATADIR
 debug=DEBUG
 
 function test_fail {
-if [[ $1 != 0 ]]
-then
+if [[ $1 != 0 ]]; then
     track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
     exit "$1"
 fi
@@ -34,12 +32,12 @@ fi
 track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
 
 cd "$datadir/${obsnum}" || exit 1
-if [[ -z $debug ]]
-then
-    ms_flag_by_uvdist.py "${obsnum}.ms" DATA -a
+if [[ -z $debug ]]; then
+    column=DATA
 else
-    ms_flag_by_uvdist.py "${obsnum}.ms" CORRECTED_DATA -a 
+    column=CORRECTED_DATA
 fi
 
-track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+ms_flag_by_uvdist.py "${obsnum}.ms" $column -a 
 
+track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"

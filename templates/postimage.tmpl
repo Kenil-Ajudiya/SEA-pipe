@@ -6,8 +6,7 @@ pipeuser=PIPEUSER
 obsnum=OBSNUM
 
 # If obsnum is a file, then we are in an array job
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
     taskid="${SLURM_ARRAY_TASK_ID}"
     jobid="${SLURM_ARRAY_JOB_ID}"
     
@@ -23,8 +22,7 @@ echo "jobid: ${jobid}"
 echo "taskid: ${taskid}"
 
 function test_fail {
-    if [[ $1 != 0 ]]
-    then
+    if [[ $1 != 0 ]]; then
         track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
         exit "$1"
     fi
@@ -42,8 +40,8 @@ subchans="0000 0001 0002 0003 MFS"
 method=scaled
 
 # Sky model
-POS_MODEL_CATALOGUE="${GXBASE}/models/NVSS_SUMSS_psfcal.fits"
-FLUX_MODEL_CATALOGUE="${GXBASE}/models/GGSM_sparse_unresolved.fits"
+POS_MODEL_CATALOGUE="${SOFTBASE}/sky_models/NVSS_SUMSS_psfcal.fits"
+FLUX_MODEL_CATALOGUE="${SOFTBASE}/sky_models/GGSM_sparse_unresolved.fits"
 # Set max separation for flux_warp crossmatch as ~ 1' -- unlikely that the ionosphere would be that brutal
 separation=$(echo "60/3600" | bc -l)
 
@@ -55,8 +53,7 @@ datadir=BASEDIR
 cd "${datadir}/${obsnum}" || exit 1
 
 metafits="${obsnum}.metafits"
-if [[ ! -e ${metafits} ]] || [[ ! -s ${metafits} ]]
-then
+if [[ ! -e ${metafits} ]] || [[ ! -s ${metafits} ]]; then
     wget -O "${metafits}" http://ws.mwatelescope.org/metadata/fits?obs_id=${obsnum}
     test_fail $?
 fi
@@ -76,31 +73,25 @@ metafits=$(ls -t ${obsnum}*metafits* | head -1)
 for subchan in ${subchans}
 do
     BMAJ=$(pyhead.py -p BMAJ "${obsnum}_deep-${subchan}-image-pb.fits" | awk '{print $3}' )
-    if [[ "$BMAJ" == "0"  ]]
-    then
+    if [[ "$BMAJ" == "0"  ]]; then
         echo "${obsnum}_deep-${subchan}-image-pb.fits has zero-size PSF: something is broken!"
         exit 1
     fi
     
-    if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_rms.fits" ]]
-    then
+    if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_rms.fits" ]]; then
         BANE --cores 1 --compress --noclobber "${obsnum}_deep-${subchan}-image-pb.fits"
     fi
 
-    if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_comp.fits"  ]]
-    then
+    if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_comp.fits"  ]]; then
         # The mask_image.py operation will destructively remove the pixels. I can not think of a case 
         # where we actually want to keep pixels below 5% of the PB, apart from _maybe_ causing non-uniform
         # noise issues in the swarp image. In any case, the below attempts to preserve the original image
         # as a just in case. 
-        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_original.fits" ]]
-        then 
+        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_original.fits" ]]; then 
             cp -v "${obsnum}_deep-${subchan}-image-pb.fits" "${obsnum}_deep-${subchan}-image-pb_original.fits"
         fi
-        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb.fits" ]]
-        then 
-            if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_original.fits" ]]
-            then 
+        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb.fits" ]]; then 
+            if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_original.fits" ]]; then 
                 echo "Missing ${obsnum}_deep-${subchan}-image-pb.fits file, and no copy found. This should not happen. "
                 test_fail 2
             fi
@@ -109,8 +100,7 @@ do
 
         # Generate a weight map for mosaicking
         chans=($( pyhead.py -p CHANNELS "${obsnum}.metafits" | awk '{print $3}' | sed "s/,/ /g" ))
-        if [[ ${subchan} == "MFS" ]]
-        then
+        if [[ ${subchan} == "MFS" ]]; then
             i=0
             j=23
         else
@@ -139,8 +129,7 @@ do
         aegean  --autoload --cores=${GXNPCPUS} --table="./${obsnum}_deep-${subchan}-image-pb.fits" "./${obsnum}_deep-${subchan}-image-pb.fits" > >(tee -a "${obsnum}_deep-${subchan}_aegean.log") 2> >(tee -a "${obsnum}_deep-${subchan}_aegean.log" >&2)
     fi
     nsrc=$(grep "INFO found" "${obsnum}_deep-${subchan}_aegean.log" | head -1 | awk '{print $3}')
-    if [[ $nsrc -lt $minsrcs ]]
-    then
+    if [[ $nsrc -lt $minsrcs ]]; then
         echo "Can't warp ${obsnum} -- only $nsrc sources and minimum required id $minsrcs -- probably a horrible image"
     else
         RA=$( pyhead.py -p RA "${obsnum}.metafits" | awk '{print $3}' )
@@ -154,8 +143,7 @@ do
         # TODO make this dependent on CENTCHAN
         radius=50. #24.8
         
-        if [[ ! -e "${obsnum}_${subchan}_complete_sources_xm.fits" ]]
-        then
+        if [[ ! -e "${obsnum}_${subchan}_complete_sources_xm.fits" ]]; then
             fits_warp.py \
             --incat "${obsnum}_deep-${subchan}-image-pb_comp.fits" \
             --refcat "${POS_MODEL_CATALOGUE}" \
@@ -168,8 +156,7 @@ do
             --infits "${obsnum}_deep-${subchan}-image-pb.fits"
         fi
         
-        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp.fits" ]]
-        then
+        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp.fits" ]]; then
             fits_warp.py --incat "./${obsnum}_deep-${subchan}-image-pb_comp.fits" \
             --refcat "${POS_MODEL_CATALOGUE}" \
             --corrected "./${obsnum}_deep-${subchan}-image-pb_comp_warp-corrected.fits" \
@@ -190,8 +177,7 @@ do
         fi
 
         
-        if [[ ! -e ${obsnum}_${subchan}_xm.fits ]]
-        then
+        if [[ ! -e ${obsnum}_${subchan}_xm.fits ]]; then
             # flux_wrap dependency here
             # Match the image catalogue to the model table:
             match_catalogues \
@@ -212,8 +198,7 @@ do
             --eflux "err_int_flux" \
             --localrms "local_rms"
         fi
-        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp_${method}_cf_output.txt" ]]
-        then
+        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp_${method}_cf_output.txt" ]]; then
             flux_warp \
             "${obsnum}_${subchan}_xm.fits" \
             "${obsnum}_deep-${subchan}-image-pb_warp.fits" \
@@ -244,8 +229,7 @@ do
         
         # The RMS and BKG maps will not have changed much from the ionospheric warping, so I can just
         # rename them and update BSCALE
-        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_rms.fits" ]]
-        then
+        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_rms.fits" ]]; then
             BANE --cores 1 --compress --noclobber "${obsnum}_deep-${subchan}-image-pb.fits"
         fi
         
@@ -255,16 +239,13 @@ do
         pyhead.py -u BSCALE "$factor" "${obsnum}_deep-${subchan}-image-pb_warp_rms.fits"
         
         # rerun the source-finding -- don't save to the log this time as the numbers should not have changed
-        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp_comp.fits" ]]
-        then
+        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp_comp.fits" ]]; then
             aegean --autoload --cores=${GXNPCPUS} --table="./${obsnum}_deep-${subchan}-image-pb_warp.fits" "./${obsnum}_deep-${subchan}-image-pb_warp.fits"
         fi
-        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp_weight.fits" ]]
-        then
+        if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp_weight.fits" ]]; then
             # Generate a weight map for mosaicking
             chans=($( pyhead.py -p CHANNELS "${obsnum}.metafits" | awk '{print $3}' | sed "s/,/ /g" ))
-            if [[ ${subchan} == "MFS" ]]
-            then
+            if [[ ${subchan} == "MFS" ]]; then
                 i=0
                 j=23
             else

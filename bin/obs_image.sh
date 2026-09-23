@@ -114,8 +114,9 @@ chmod 755 "${script}"
 echo '#!/bin/bash' > ${script}.sbatch
 echo "srun --cpus-per-task=${GXNCPUS} --ntasks=1 --ntasks-per-node=1 singularity run ${GXCONTAINER} ${script}" >> ${script}.sbatch
 
-sub="sbatch --begin=now+5minutes --export=ALL  ${maxtime} --mem=${GXABSMEMORY}G --clusters=${GXCOMPUTER} --output=${output} --error=${error}"
+sub="sbatch --begin=now --export=ALL  ${maxtime} --mem=${GXABSMEMORY}G --clusters=${GXCOMPUTER} --output=${output} --error=${error}"
 sub="${sub} ${GXNCPULINE} ${account} ${GXTASKLINE} ${jobarray} ${depend} ${queue} ${script}.sbatch"
+
 if [[ -n ${tst} ]]; then
     echo "script is ${script}"
     echo "submit via:"
@@ -127,7 +128,7 @@ fi
 jobid=($(${sub}))
 jobid=${jobid[3]}
 
-echo "Submitted ${script} as ${jobid}. Follow progress here:"
+echo "Submitted ${script} as ${jobid} . Follow progress here:"
 
 for taskid in $(seq ${numfiles}); do
     # rename the err/output files as we now know the jobid

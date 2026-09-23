@@ -70,7 +70,7 @@ if [[ -z ${obsnum} || -z ${project} ]]; then
     usage
 fi
 
-if [[ ! -z ${GXACCOUNT} ]]; then
+if [[ -n ${GXACCOUNT} ]]; then
     account="--account=${GXACCOUNT}"
 fi
 
@@ -83,11 +83,10 @@ else
     jobarray=''
 fi
 
-queue="-p ${GXSTANDARDQ}"
 datadir="${GXSCRATCH}/$project"
 
 # set dependency
-if [[ ! -z ${dep} ]]; then
+if [[ -n ${dep} ]]; then
     if [[ -f ${obsnum} ]]; then
         depend="--dependency=aftercorr:${dep}"
     else
@@ -95,7 +94,7 @@ if [[ ! -z ${dep} ]]; then
     fi
 fi
 
-if [[ ! -z $ramcopy ]]; then
+if [[ -n $ramcopy ]]; then
     maxtime="--time=01:00:00"
 else
     maxtime="--time=06:00:00"
@@ -131,12 +130,13 @@ fi
 chmod 755 "${script}"
 
 # sbatch submissions need to start with a shebang
-# echo '#!/bin/bash' > ${script}.sbatch
-# echo "srun --cpus-per-task=${CPUSPERTASK} --ntasks=1 --ntasks-per-node=1  singularity run ${GXCONTAINER} ${script}" >> ${script}
+echo '#!/bin/bash' > ${script}.sbatch
+echo "srun --cpus-per-task=${CPUSPERTASK} --nodes=1 --ntasks=1 --ntasks-per-node=1  singularity run ${GXCONTAINER} ${script}" >> ${script}.sbatch
 
 sub="sbatch --begin=now+5minutes --export=ALL --cpus-per-task=${CPUSPERTASK} --mem=${MEMPERTASK}G --partition=${GXSTANDARDQ} --output=${output} --error=${error}"
-sub="${sub} ${account} ${jobarray} ${depend} ${queue} ${maxtime} ${script}"
-if [[ ! -z ${tst} ]]; then
+sub="${sub} ${account} ${jobarray} ${depend} ${maxtime} ${script}.sbatch"
+
+if [[ -n ${tst} ]]; then
     echo "script is ${script}"
     echo "submit via:"
     echo "${sub}"

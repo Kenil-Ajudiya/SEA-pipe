@@ -60,7 +60,7 @@ if [[ -z ${obsnum} ]] || [[ -z $project ]] || [[ ! -d ${base} ]]; then
     usage
 fi
 
-if [[ ! -z ${dep} ]]; then
+if [[ -n ${dep} ]]; then
     if [[ -f ${obsnum} ]]; then
         depend="--dependency=aftercorr:${dep}"
     else
@@ -68,7 +68,7 @@ if [[ ! -z ${dep} ]]; then
     fi
 fi
 
-if [[ ! -z ${GXACCOUNT} ]]; then
+if [[ -n ${GXACCOUNT} ]]; then
     account="--account=${GXACCOUNT}"
 fi
 
@@ -113,7 +113,8 @@ echo "srun --cpus-per-task=${GXNCPUS} --ntasks=1 --ntasks-per-node=1 singularity
 
 sub="sbatch --begin=now+5minutes --export=ALL  ${maxtime} --mem=${GXABSMEMORY}G -M ${GXCOMPUTER} --output=${output} --error=${error}"
 sub="${sub} ${GXNCPULINE} ${account} ${GXTASKLINE} ${jobarray} ${depend} ${queue} ${script}.sbatch"
-if [[ ! -z ${tst} ]]; then
+
+if [[ -n ${tst} ]]; then
     echo "script is ${script}"
     echo "submit via:"
     echo "${sub}"
@@ -124,7 +125,7 @@ fi
 jobid=($(${sub}))
 jobid=${jobid[3]}
 
-echo "Submitted ${script} as ${jobid}. Follow progress here:"
+echo "Submitted ${script} as ${jobid} . Follow progress here:"
 
 for taskid in $(seq ${numfiles}); do
     # rename the err/output files as we now know the jobid

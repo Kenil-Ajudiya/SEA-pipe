@@ -18,8 +18,7 @@ pipeuser="${GXUSER}"
 dep=
 tst=
 # parse args and set options
-while getopts ':td:a:p:' OPTION
-do
+while getopts ':td:a:p:' OPTION; do
     case "$OPTION" in
 	d)
 	    dep=${OPTARG}
@@ -46,29 +45,24 @@ queue="-p ${GXSTANDARDQ}"
 base="${GXSCRATCH}/$project"
 
 # if obsid is empty then just print help
-if [[ -z ${obsnum} ]] || [[ -z $project ]] || [[ ! -d ${base} ]]
-then
+if [[ -z ${obsnum} ]] || [[ -z $project ]] || [[ ! -d ${base} ]]; then
     usage
 fi
 
-if [[ ! -z ${dep} ]]
-then
-    if [[ -f ${obsnum} ]]
-    then
+if [[ -n ${dep} ]]; then
+    if [[ -f ${obsnum} ]]; then
         depend="--dependency=aftercorr:${dep}"
     else
         depend="--dependency=afterok:${dep}"
     fi
 fi
 
-if [[ ! -z ${GXACCOUNT} ]]
-then
+if [[ -n ${GXACCOUNT} ]]; then
     account="--account=${GXACCOUNT}"
 fi
 
 # Establish job array options
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
     numfiles=$(wc -l "${obsnum}" | awk '{print $1}')
     jobarray="--array=1-${numfiles}"
 else
@@ -86,8 +80,7 @@ cat "${GXBASE}/templates/postimage.tmpl" | sed -e "s:OBSNUM:${obsnum}:g" \
 output="${GXLOG}/postimage_${obsnum}.o%A"
 error="${GXLOG}/postimage_${obsnum}.e%A"
 
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
    output="${output}_%a"
    error="${error}_%a"
 fi
@@ -100,8 +93,8 @@ echo "srun --cpus-per-task=${GXNCPUS} --ntasks=1 --ntasks-per-node=1 singularity
 
 sub="sbatch --begin=now+5minutes --export=ALL --time=8:00:00 --mem=${GXABSMEMORY}G -M ${GXCOMPUTER} --output=${output} --error=${error}"
 sub="${sub} ${GXNCPULINE} ${account} ${GXTASKLINE} ${jobarray} ${depend} ${queue} ${script}.sbatch"
-if [[ ! -z ${tst} ]]
-then
+
+if [[ -n ${tst} ]]; then
     echo "script is ${script}"
     echo "submit via:"
     echo "${sub}"
@@ -114,22 +107,18 @@ jobid=${jobid[3]}
 
 echo "Submitted ${script} as ${jobid} . Follow progress here:"
 
-for taskid in $(seq ${numfiles})
-    do
+for taskid in $(seq ${numfiles}); do
     # rename the err/output files as we now know the jobid
     obserror=$(echo "${error}" | sed -e "s/%A/${jobid}/" -e "s/%a/${taskid}/")
     obsoutput=$(echo "${output}" | sed -e "s/%A/${jobid}/" -e "s/%a/${taskid}/")
 
-    if [[ -f ${obsnum} ]]
-    then
+    if [[ -f ${obsnum} ]]; then
         obs=$(sed -n -e "${taskid}"p "${obsnum}")
     else
         obs=$obsnum
     fi
 
-
-    if [ "${GXTRACK}" = "track" ]
-    then
+    if [[ "${GXTRACK}" = "track" ]]; then
         # record submission
         ${GXCONTAINER} track_task.py queue --jobid="${jobid}" --taskid="${taskid}" --task='postimage' --submission_time="$(date +%s)" \
                             --batch_file="${script}" --obs_id="${obs}" --stderr="${obserror}" --stdout="${obsoutput}"

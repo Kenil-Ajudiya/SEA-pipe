@@ -6,8 +6,7 @@ pipeuser=PIPEUSER
 obsnum=OBSNUM
 
 # If obsnum is a file, then we are in an array job
-if [[ -f "${obsnum}" ]]
-then
+if [[ -f "${obsnum}" ]]; then
     taskid="${SLURM_ARRAY_TASK_ID}"
     jobid="${SLURM_ARRAY_JOB_ID}"
 
@@ -23,8 +22,7 @@ echo "jobid: ${jobid}"
 echo "taskid: ${taskid}"
 
 function test_fail {
-if [[ $1 != 0 ]]
-then
+if [[ $1 != 0 ]]; then
     track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
     exit "$1"
 fi
@@ -51,16 +49,14 @@ mkdir -p /tmp/${SLURM_JOB_ID}/slurm_wsclean
 cp -rf ${obsnum}.ms /tmp/${SLURM_JOB_ID}/slurm_wsclean
 
 # Adding a check to see if there are any selfsolutions already, will not recalculated
-if [[ -e ${obsnum}_selfsolutions.bin ]] || [[ -e ${obsnum}_selfsolutions_failed.bin ]]
-then 
+if [[ -e ${obsnum}_selfsolutions.bin ]] || [[ -e ${obsnum}_selfsolutions_failed.bin ]]; then 
     echo "There is already a selfsolutions file?? Check what you want to do first, but i am exiting without doing anything!!! "
     exit 1
 fi 
 
 
 # Which data column to image
-if [[ ! -z $debug ]]
-then
+if [[ -n $debug ]]; then
     taql update /tmp/${SLURM_JOB_ID}/slurm_wsclean/${obsnum}.ms set DATA=CORRECTED_DATA
 fi
 # Removing any previous model column to make sure its not accidentally included in the model for selfcal
@@ -70,16 +66,14 @@ taql alter table /tmp/${SLURM_JOB_ID}/slurm_wsclean/${obsnum}.ms drop column MOD
 metafits="$(ls -t ${obsnum}*metafits* | head -1)"
 
 # Checking if there is a gross sidelobe: 
-if [[ ! -e "${obsnum}_beamlobes.txt" ]]
-then
+if [[ ! -e "${obsnum}_beamlobes.txt" ]]; then
     get_mwa_pb_lobes.py ${metafits} -mS > ${obsnum}_beamlobes.txt
 else
     echo "Already have the beam, not recalculating"
 fi 
 
 
-if [[ $(cat ${obsnum}_beamlobes.txt | wc -l ) -eq 1 ]]
-then 
+if [[ $(cat ${obsnum}_beamlobes.txt | wc -l ) -eq 1 ]]; then 
     ra_sidelobe=$(cat ${obsnum}_beamlobes.txt | awk '{print $2}')
     dec_sidelobe=$(cat ${obsnum}_beamlobes.txt | awk '{print $3}')
 else
@@ -95,16 +89,14 @@ dec_mainlobe=$(cat ${obsnum}_mainlobes.txt | awk '{print $3}')
 ateam_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe})
 # crab_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe} -s "Crab")
 # cyga_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe} -s "CygA")
-if [[ "$ateam_fov" == "False" ]]
-then
+if [[ "$ateam_fov" == "False" ]]; then
     echo "There is neither Crab nor CygA in the fov or sidelobe, no self cal needed!"
     self2="False"
 else
     echo "Something bright in the main fov, going to do self-cal"
 fi 
 
-if [[ "$self" == "False" ]] && [[ "${self2}" == "False" ]]
-then 
+if [[ "$self" == "False" ]] && [[ "${self2}" == "False" ]]; then 
     echo "There is no need to do selfcal here!"
     exit 0
 else
@@ -160,8 +152,7 @@ multiscale="-multiscale -mgain 0.85 -multiscale-gain 0.15"
 # Set the pipefail so the test_fail does not test for tee
 set -o pipefail
 # shallow clean (for selfcal) 
-if [[ ! -e "${obsnum}_initial-MFS-XX-image.fits" ]]
-then
+if [[ ! -e "${obsnum}_initial-MFS-XX-image.fits" ]]; then
     wsclean \
             -abs-mem ${GXMEMORY} \
             $multiscale \
@@ -183,8 +174,7 @@ else
 fi
 
 # Check if it made initial images 
-if [[ ! -e "${obsnum}_initial-MFS-XX-image.fits" ]]
-then
+if [[ ! -e "${obsnum}_initial-MFS-XX-image.fits" ]]; then
     echo 'Initial image did not generate! Something probs happened with WSClean'
     exit 1
 else

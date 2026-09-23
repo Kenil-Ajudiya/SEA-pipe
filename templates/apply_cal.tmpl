@@ -6,8 +6,7 @@ calid=CALID
 selfcal=SELFCAL
 
 # If obsnum is a file, then we are in an array job
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
     taskid=${SLURM_ARRAY_TASK_ID}
     jobid=${SLURM_ARRAY_JOB_ID}
 
@@ -20,8 +19,7 @@ else
 fi
 
 # If obsnum is a file, then we are in an array job
-if [[ -f ${calid} ]]
-then
+if [[ -f ${calid} ]]; then
     echo "calid file is ${calid}"
     calid=$(sed -n -e "${taskid}"p "${calid}")
     echo "apply_cal calid ${calid}"
@@ -31,8 +29,7 @@ echo "jobid: ${jobid}"
 echo "taskid: ${taskid}"
 
 function test_fail {
-if [[ $1 != 0 ]]
-then
+if [[ $1 != 0 ]]; then
     track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
     exit "$1"
 fi
@@ -47,20 +44,17 @@ track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date
 cd "${base}/${obsnum}" || exit
 metafits="${obsnum}.metafits"
 
-if [[ ! -z $selfcal ]]
-then 
+if [[ -n $selfcal ]]; then 
     calfile="${base}/${calid}/${calid}_selfsolutions.bin"
     # Checking if there is a gross sidelobe: 
-    if [[ ! -e "${obsnum}_beamlobes.txt" ]]
-    then
+    if [[ ! -e "${obsnum}_beamlobes.txt" ]]; then
         get_mwa_pb_lobes.py ${metafits} -mS > ${obsnum}_beamlobes.txt
     else
         echo "Already have the beam, not recalculating"
     fi 
 
 
-    if [[ $(cat ${obsnum}_beamlobes.txt | wc -l ) -eq 1 ]]
-    then 
+    if [[ $(cat ${obsnum}_beamlobes.txt | wc -l ) -eq 1 ]]; then 
         ra_sidelobe=$(cat ${obsnum}_beamlobes.txt | awk '{print $2}')
         dec_sidelobe=$(cat ${obsnum}_beamlobes.txt | awk '{print $3}')
     else
@@ -74,8 +68,7 @@ then
 
     # Check if crab or cyg is in the main fov
     ateam_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe})
-    if [[ "$ateam_fov" == "False" ]]
-    then
+    if [[ "$ateam_fov" == "False" ]]; then
         echo "There is no bright thing in main FOV, no self-cal needed!!"
         self2="False"
     else
@@ -83,8 +76,7 @@ then
         echo "ateam: $ateam_fov"
     fi 
 
-    if [[ "$self" == "False" ]] && [[ "${self2}" == "False" ]]
-    then 
+    if [[ "$self" == "False" ]] && [[ "${self2}" == "False" ]]; then 
         echo "Don't want to apply the selfcal, no need!"
         exit 0
     else
@@ -96,8 +88,7 @@ fi
 
 
 
-if [[ ! -e "${calfile}" ]]
-then
+if [[ ! -e "${calfile}" ]]; then
     echo "Could not find calibrator file ${calid}"
     track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
     exit 1
@@ -106,7 +97,7 @@ fi
 echo "Calibration file is ${calfile}"
 
 # If in debugging mode, apply to the CORRECTED_DATA column
-# if [[ ! -z $debug ]]
+# if [[ -n $debug ]]
 # then 
 #     hyperdrive \
 #     solutions-apply \
@@ -114,8 +105,7 @@ echo "Calibration file is ${calfile}"
 
 # fi 
 # If in debugging mode, apply to the CORRECTED_DATA column
-if [[ ! -z $debug ]]
-then
+if [[ -n $debug ]]; then
     applysolutions \
                 ${obsnum}.ms \
                 "${calfile}"

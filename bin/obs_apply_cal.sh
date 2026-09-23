@@ -32,8 +32,7 @@ debug=
 selfcal=
 
 # parse args and set options
-while getopts ':tzsd:a:c:p:' OPTION
-do
+while getopts ':tzsd:a:c:p:' OPTION; do
     case "$OPTION" in
     d)
         dep=${OPTARG}
@@ -64,29 +63,24 @@ shift  "$(($OPTIND -1))"
 obsnum=$1
 
 # if obsid or calid is empty then just print help
-if [[ -z ${obsnum} ]] || [[ -z ${calid} ]]
-then
+if [[ -z ${obsnum} ]] || [[ -z ${calid} ]]; then
     usage
 fi
 
-if [[ ! -z ${dep} ]]
-then
-    if [[ -f ${obsnum} ]]
-    then
+if [[ -n ${dep} ]]; then
+    if [[ -f ${obsnum} ]]; then
         depend="--dependency=aftercorr:${dep}"
     else
         depend="--dependency=afterok:${dep}"
     fi
 fi
 
-if [[ ! -z ${GXACCOUNT} ]]
-then
+if [[ -n ${GXACCOUNT} ]]; then
     account="--account=${GXACCOUNT}"
 fi
 
 # Establish job array options
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
     numfiles=$(wc -l ${obsnum} | awk '{print $1}')
     jobarray="--array=1-${numfiles}"
 else
@@ -98,8 +92,7 @@ fi
 queue="-p ${GXSTANDARDQ}"
 base="${GXSCRATCH}/${project}"
 
-if [[ $? != 0 ]]
-then
+if [[ $? != 0 ]]; then
     echo "Could not find calibrator file"
     echo "looked for latest of: ${base}/${calid}/${calid}*solutions*.bin"
     exit 1
@@ -120,8 +113,7 @@ chmod 755 "${script}"
 output="${GXLOG}/apply_cal_${obsnum}.o%A"
 error="${GXLOG}/apply_cal_${obsnum}.e%A"
 
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
     output="${output}_%a"
     error="${error}_%a"
 fi
@@ -130,17 +122,14 @@ fi
 echo '#!/bin/bash' > ${script}.sbatch
 echo "srun --cpus-per-task=1 --ntasks=1 --ntasks-per-node=1 singularity run ${GXCONTAINER} ${script}" >> ${script}.sbatch
 
-if [[ -n ${GXNCPULINE} ]]
-then
-    # autoflag only needs a single CPU core
+if [[ -n ${GXNCPULINE} ]]; then
     GXNCPULINE="--ntasks-per-node=1"
 fi
 
-sub="sbatch --begin=now+5minutes  --export=ALL ${account} --time=01:00:00 --mem=24G -M ${GXCOMPUTER} --output=${output} --error=${error} "
-sub="${sub}  ${GXNCPULINE} ${account} ${GXTASKLINE} ${jobarray} ${depend} ${queue} ${script}.sbatch"
+sub="sbatch --begin=now+5minutes --export=ALL --time=01:00:00 --mem=24G -M ${GXCOMPUTER} --output=${output} --error=${error}"
+sub="${sub} ${GXNCPULINE} ${account} ${GXTASKLINE} ${jobarray} ${depend} ${queue} ${script}.sbatch"
 
-if [[ ! -z ${tst} ]]
-then
+if [[ -n ${tst} ]]; then
     echo "script is ${script}"
     echo "submit via:"
     echo "${sub}"
@@ -151,23 +140,20 @@ fi
 jobid=($(${sub}))
 jobid=${jobid[3]}
 
-echo "Submitted ${script} as ${jobid} . Follow progress here:"
+echo "Submitted ${script} as ${jobid} . Follow progress here:" # Please leave the space after the jobid so that auto_process.sh can reat the jobid correctly, without the full-stop.
 
-for taskid in $(seq ${numfiles})
-    do
+for taskid in $(seq ${numfiles}); do
     # rename the err/output files as we now know the jobid
     obserror=`echo ${error} | sed -e "s/%A/${jobid}/" -e "s/%a/${taskid}/"`
     obsoutput=`echo ${output} | sed -e "s/%A/${jobid}/" -e "s/%a/${taskid}/"`
 
-    if [[ -f ${obsnum} ]]
-    then
+    if [[ -f ${obsnum} ]]; then
         obs=$(sed -n -e ${taskid}p ${obsnum})
     else
         obs=$obsnum
     fi
 
-    if [ "${GXTRACK}" = "track" ]
-    then
+    if [[ "${GXTRACK}" = "track" ]]; then
         # record submission
         ${GXCONTAINER} track_task.py queue --jobid=${jobid} --taskid=${taskid} --task='apply_cal' --submission_time=`date +%s` --batch_file=${script} \
                             --obs_id=${obs} --stderr=${obserror} --stdout=${obsoutput}

@@ -14,8 +14,7 @@ debug=DEBUG
 idg=IDG
 
 # If obsnum is a file, then we are in an array job
-if [[ -f "${obsnum}" ]]
-then
+if [[ -f "${obsnum}" ]]; then
     taskid=${SLURM_ARRAY_TASK_ID}
     jobid=${SLURM_ARRAY_JOB_ID}
 
@@ -31,8 +30,7 @@ echo "jobid: ${jobid}"
 echo "taskid: ${taskid}"
 
 function test_fail {
-if [[ $1 != 0 ]]
-then
+if [[ $1 != 0 ]]; then
     track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
     exit "$1"
 fi
@@ -46,8 +44,7 @@ track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date
 cd "${datadir}/${obsnum}" || exit
 
 metafits="${obsnum}.metafits"
-if [[ ! -e ${metafits} ]] || [[ ! -s ${metafits} ]]
-then
+if [[ ! -e ${metafits} ]] || [[ ! -s ${metafits} ]]; then
     wget -O "${metafits}" "http://ws.mwatelescope.org/metadata/fits?obs_id=${obsnum}"
     test_fail $?
 fi
@@ -71,11 +68,9 @@ fi
 
 submodel="${obsnum}.ateam_outlier"
 
-if [[ ! -e "${submodel}" ]]
-then
+if [[ ! -e "${submodel}" ]]; then
     debugoption=
-    if [[ ! -z $debug ]]
-    then
+    if [[ -n $debug ]]; then
         debugoption='--corrected-data'
     fi
     echo "Generating model of A-Team sources for uv-subtraction"
@@ -88,8 +83,7 @@ then
                                     --model-output "${submodel}" 
 fi
 
-if [[ -e "${submodel}" ]]
-then
+if [[ -e "${submodel}" ]]; then
     echo "Running wslean outlier clean and subtraction... "
     chmod +x "${submodel}"
     ./"${submodel}"

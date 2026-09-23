@@ -1,7 +1,4 @@
 #!/bin/bash -l
-#SBATCH --time=12:00:00
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
 
 set -x
 
@@ -55,7 +52,7 @@ fraction=FRACTION
 sthresh=STHRESH
 
 # GLEAM-X sky model
-catfile="${GXBASE}/models/GGSM.txt"
+catfile="${SOFTBASE}/sky_models/GGSM.txt"
 
 # MWA beam information
 MWAPATH="${GXMWAPB}"
@@ -96,29 +93,6 @@ chan=$(singularity run $GXCONTAINER pyhead.py -p CENTCHAN "$metafits" | awk '{pr
 
 if [[ ! -e "${obsnum}_local_gleam_model.txt" ]]; then
     ln -s ${catfile} "${obsnum}_local_gleam_model.txt"
-
-#     singularity run ${GXCONTAINER} crop_catalogue.py \
-#         --ra="${RA}" \
-#         --dec="${Dec}" \
-#         --radius=30 \
-#         --top-bright=300 \
-#         --metafits="${metafits}" \
-#         --catalogue="${catfile}" \
-#         --fluxcol=S_200 \
-#         --plot "${obsnum}_local_gleam_model.png" \
-#         --output "${obsnum}_cropped_catalogue.fits"
-    
-#     singularity run ${GXCONTAINER} vo2model.py \
-#         --catalogue="${obsnum}_cropped_catalogue.fits" \
-#         --point \
-#         --output="${obsnum}_local_gleam_model.txt" \
-#         --racol=RAJ2000 \
-#         --decol=DEJ2000 \
-#         --acol=a \
-#         --bcol=b \
-#         --pacol=pa \
-#         --fluxcol=S_200 \
-#         --alphacol=alpha
 fi
 calmodel="${obsnum}_local_gleam_model.txt"
 

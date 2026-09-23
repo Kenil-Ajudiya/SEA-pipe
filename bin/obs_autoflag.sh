@@ -19,8 +19,7 @@ dep=
 tst=
 
 # parse args and set options
-while getopts ':td:a:p:' OPTION
-do
+while getopts ':td:a:p:' OPTION; do
     case "$OPTION" in
 	a)
         account="--account=${OPTARG}"
@@ -44,13 +43,11 @@ shift  "$(($OPTIND -1))"
 obsnum=$1
 
 # if obsid or project are empty then just print help
-if [[ -z ${obsnum} ]] || [[ -z ${project} ]]
-then
+if [[ -z ${obsnum} ]] || [[ -z ${project} ]]; then
     usage
 fi
 
-if [[ -z ${account} ]] && [[ -n ${GXACCOUNT} ]]
-then
+if [[ -z ${account} ]] && [[ -n ${GXACCOUNT} ]]; then
     account="--account=${GXACCOUNT}"
 else
     echo "No account specified. Specify with -a or set GXACCOUNT environment variable. Exiting."
@@ -58,8 +55,7 @@ else
 fi
 
 # Establish job array options
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
     numfiles=$(wc -l "${obsnum}" | awk '{print $1}')
     jobarray="--array=1-${numfiles}"
 else
@@ -71,10 +67,8 @@ queue="-p ${GXSTANDARDQ}"
 datadir="${GXSCRATCH}/${project}"
 
 # set dependency
-if [[ -n ${dep} ]]
-then
-    if [[ -f ${obsnum} ]]
-    then
+if [[ -n ${dep} ]]; then
+    if [[ -f ${obsnum} ]]; then
         depend="--dependency=aftercorr:${dep}"
     else
         depend="--dependency=afterok:${dep}"
@@ -91,8 +85,7 @@ cat "${GXBASE}/templates/autoflag.tmpl" | sed -e "s:OBSNUM:${obsnum}:g" \
 
 output="${GXLOG}/autoflag_${obsnum}.o%A"
 error="${GXLOG}/autoflag_${obsnum}.e%A"
-if [[ -f ${obsnum} ]]
-then
+if [[ -f ${obsnum} ]]; then
     output="${output}_%a"
     error="${error}_%a"
 fi
@@ -100,13 +93,13 @@ fi
 chmod 755 "${script}"
 
 # sbatch submissions need to start with a shebang
-# echo '#!/bin/bash' > ${script}.sbatch
-# echo "srun --cpus-per-task=1 --ntasks=1 --ntasks-per-node=1 singularity run ${GXCONTAINER} ${script}" >> ${script}.sbatch
-sub="sbatch --begin=now --export=ALL ${account} --partition=${GXSTANDARDQ} --job-name=autoflag_${obsnum} --output=${output} --error=${error} "
-sub="${sub} ${jobarray} ${depend} ${script}"
+echo '#!/bin/bash' > ${script}.sbatch
+echo "srun --cpus-per-task=1 --ntasks=1 --ntasks-per-node=1 singularity run ${GXCONTAINER} ${script}" >> ${script}.sbatch
 
-if [[ -n ${tst} ]]
-then
+sub="sbatch --begin=now+2minutes --export=ALL ${account} --time=01:00:00 --partition=${GXSTANDARDQ} --job-name=autoflag_${obsnum} --output=${output} --error=${error}"
+sub="${sub} ${jobarray} ${depend} ${script}.sbatch"
+
+if [[ -n ${tst} ]]; then
     echo "script is ${script}"
     echo "submit via:"
     echo "${sub}"
@@ -117,25 +110,22 @@ fi
 jobid=($(${sub}))
 jobid=${jobid[3]}
 
-echo "Submitted ${script} as ${jobid} Follow progress here:"
+echo "Submitted ${script} as ${jobid} . Follow progress here:" # Please leave the space after the jobid so that auto_process.sh can reat the jobid correctly, without the full-stop.
 
-for taskid in $(seq ${numfiles})
-do
+for taskid in $(seq ${numfiles}); do
     # rename the err/output files as we now know the jobid
     obserror=$(echo "${error}" | sed -e "s/%A/${jobid}/" -e "s/%a/${taskid}/")
     obsoutput=$(echo "${output}" | sed -e "s/%A/${jobid}/" -e "s/%a/${taskid}/")
     
-    if [[ -f ${obsnum} ]]
-    then
+    if [[ -f ${obsnum} ]]; then
         obs=$(sed -n -e "${taskid}"p "${obsnum}")
     else
         obs=$obsnum
     fi
 
-    if [[ "${GXTRACK}" = "track" ]]
-    then
+    if [[ "${GXTRACK}" = "track" ]]; then
         # record submission
-        ${GXCONTAINER} track_task.py queue --jobid="${jobid}" --taskid="${taskid}" --task='flag' --submission_time="$(date +%s)"\
+        ${GXCONTAINER} track_task.py queue --jobid="${jobid}" --taskid="${taskid}" --task='flag' --submission_time="$(date +%s)" \
                             --batch_file="${script}" --obs_id="${obs}" --stderr="${obserror}" --stdout="${obsoutput}"
     fi
 

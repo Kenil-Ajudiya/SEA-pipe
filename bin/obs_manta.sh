@@ -35,7 +35,7 @@ allow_resubmit=0
 edgeflag=80
 
 # parse args and set options
-while getopts ':tgd:p:s:k:f:e:r:' OPTION; do
+while getopts 'tgd:p:s:k:f:rh' OPTION; do
     case "$OPTION" in
     d)
         dep=${OPTARG} ;;
@@ -78,11 +78,17 @@ cd "${base}" || exit 1
 dllist=""
 if [[ ! -f "${obsnum}" ]]; then
     list=${obsnum}
+    for item in $list; do # Validate that the list contains only integers
+        if ! [[ $item =~ ^[0-9]+$ ]]; then
+            echo "Error: The provided ObsID input is neither an accessible file nor a valid list of integer values."
+            exit 1
+        fi
+    done
 else
     list=$(cat "${obsnum}")
 fi
 
-echo "" > "${obsnum}_manta.tmp"
+rm -f "${obsnum}_manta.tmp"
 
 # Set up telescope-configuration-dependent options
 # Might use these later to get different metafits files etc
@@ -138,12 +144,11 @@ chmod 755 "${script}"
 
 # sbatch submissions need to start with a shebang
 echo '#!/bin/bash' > "${script}.sbatch"
-echo "srun --export=all singularity run ${GXCONTAINER} ${script}" >> "${script}.sbatch"
+echo "srun --cpus-per-task=1 --ntasks=1 --ntasks-per-node=1 singularity run ${GXCONTAINER} ${script}" >> "${script}.sbatch"
 
 # This is the only task that should reasonably be expected to run on another cluster. 
-# Export all GLEAM-X pipeline configurable variables and the MWA_ASVO_API_KEY to ensure 
-# obs_manta completes as expected
-sub="sbatch --begin=now+1minutes --mem=10G --export=$(echo ${!GX*} | tr ' ' ','),MWA_ASVO_API_KEY,SINGULARITY_BINDPATH  --time=08:00:00 -M ${GXCOPYM} --output=${output} --error=${error}"
+# Export all GLEAM-X pipeline configurable variables and the MWA_ASVO_API_KEY to ensure obs_manta completes as expected.
+sub="sbatch --begin=now+2minutes --mem=10G --export=ALL --time=2-00:00:00 -M ${GXCOPYM} --output=${output} --error=${error}"
 sub="${sub} ${depend} ${account} ${queue} ${script}.sbatch"
 
 if [[ -n ${tst} ]]; then
@@ -178,6 +183,6 @@ if [[ "${GXTRACK}" == "track" ]]; then
     ((n+=1))
 fi
 
-echo "Submitted ${script} as ${jobid}. Follow progress here:"
+echo "Submitted ${script} as ${jobid} . Follow progress here:"
 echo "${output}"
 echo "${error}"

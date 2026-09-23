@@ -6,8 +6,7 @@ pipeuser=PIPEUSER
 obsnum=OBSNUM
 
 # If obsnum is a file, then we are in an array job
-if [[ -f "${obsnum}" ]]
-then
+if [[ -f "${obsnum}" ]]; then
     taskid="${SLURM_ARRAY_TASK_ID}"
     jobid="${SLURM_ARRAY_JOB_ID}"
 
@@ -23,8 +22,7 @@ echo "jobid: ${jobid}"
 echo "taskid: ${taskid}"
 
 function test_fail {
-if [[ $1 != 0 ]]
-then
+if [[ $1 != 0 ]]; then
     track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
     exit "$1"
 fi
@@ -34,8 +32,7 @@ fi
 base=BASEDIR
 debug=DEBUG
 # Which data column to image
-if [[ ! -z $debug ]]
-then
+if [[ -n $debug ]]; then
     datacolumn="CORRECTED_DATA"
 else
     datacolumn="DATA"
@@ -110,8 +107,7 @@ multiscale="-multiscale -mgain 0.85 -multiscale-gain 0.15"
 
 # Checking if there is a gross sidelobe: 
 get_mwa_pb_lobes.py ${metafits} -mS > ${obsnum}_beamlobes.txt
-if [[ $(cat ${obsnum}_beamlobes.txt | wc -l ) -eq 1 ]]
-then 
+if [[ $(cat ${obsnum}_beamlobes.txt | wc -l ) -eq 1 ]]; then 
     ra_sidelobe=$(cat ${obsnum}_beamlobes.txt | awk '{print $2}')
     dec_sidelobe=$(cat ${obsnum}_beamlobes.txt | awk '{print $3}')
     fov_beam=$(cat ${obsnum}_beamlobes.txt | awk '{print $4}')
@@ -130,8 +126,7 @@ chgcentre "/tmp/slurm_wsclean/${SLURM_JOB_ID}/${obsnum}.ms" ${radec_lobe}
 # Initial shallow clean to populate the model column 
 # Set the pipefail so the test_fail does not test for tee
 set -o pipefail
-if [[ ! -e "${obsnum}_sidelobe-MFS-XX-image.fits" ]]
-then
+if [[ ! -e "${obsnum}_sidelobe-MFS-XX-image.fits" ]]; then
     taql alter table ${obsnum}.ms drop column MODEL_DATA
     wsclean \
             -abs-mem ${GXMEMORY} \
@@ -153,8 +148,7 @@ then
             "/tmp/slurm_wsclean/${SLURM_JOB_ID}/${obsnum}.ms" | tee wsclean.log
 fi  
 
-if [[ -e "${obsnum}_sidelobe-MFS-XX-image.fits" ]]
-then
+if [[ -e "${obsnum}_sidelobe-MFS-XX-image.fits" ]]; then
     taql update /tmp/slurm_wsclean/${SLURM_JOB_ID}/${obsnum}.ms set ${datacolumn}=${datacolumn}-MODEL_DATA
 # Also updating the model column to remove the model of the sidelobe so its not accidentally added later 
     taql alter table /tmp/slurm_wsclean/${SLURM_JOB_ID}/${obsnum}.ms drop column MODEL_DATA

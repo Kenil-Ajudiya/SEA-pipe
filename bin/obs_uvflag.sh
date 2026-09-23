@@ -22,8 +22,7 @@ tst=
 debug=
 
 # parse args and set options
-while getopts ':tza:d:p:' OPTION
-do
+while getopts ':tza:d:p:' OPTION; do
     case "$OPTION" in
 	d)
 	    dep=${OPTARG}
@@ -50,19 +49,16 @@ shift  "$(($OPTIND -1))"
 obsnum=$1
 
 # if obsid or project are empty then just pring help
-if [[ -z ${obsnum} || -z ${project} ]]
-then
+if [[ -z ${obsnum} || -z ${project} ]]; then
     usage
 fi
 
-if [[ ! -z ${GXACCOUNT} ]]
-then
+if [[ -n ${GXACCOUNT} ]]; then
     account="--account=${GXACCOUNT}"
 fi
 
 # Establish job array options
-if [[ -f "${obsnum}" ]]
-then
+if [[ -f "${obsnum}" ]]; then
     numfiles=$(wc -l "${obsnum}" | awk '{print $1}')
     jobarray="--array=1-${numfiles}"
 else
@@ -74,10 +70,8 @@ queue="-p ${GXSTANDARDQ}"
 datadir="${GXSCRATCH}/${project}"
 
 # set dependency
-if [[ ! -z ${dep} ]]
-then
-    if [[ -f ${obsnum} ]]
-    then
+if [[ -n ${dep} ]]; then
+    if [[ -f ${obsnum} ]]; then
         depend="--dependency=aftercorr:${dep}"
     else
         depend="--dependency=afterok:${dep}"
@@ -87,27 +81,24 @@ fi
 script="${GXSCRIPT}/uvflag_${obsnum}.sh"
 
 cat "${GXBASE}/templates/uvflag.tmpl" | sed -e "s:OBSNUM:${obsnum}:g" \
-                                     -e "s:DATADIR:${datadir}:g" \
-                                     -e "s:DEBUG:${debug}:g" \
-                                     -e "s:PIPEUSER:${pipeuser}:g" > "${script}"
+                                            -e "s:DATADIR:${datadir}:g" \
+                                            -e "s:DEBUG:${debug}:g" \
+                                            -e "s:PIPEUSER:${pipeuser}:g" > "${script}"
 
 output="${GXLOG}/uvflag_${obsnum}.o%A"
 error="${GXLOG}/uvflag_${obsnum}.e%A"
 
-if [[ -f "${obsnum}" ]]
-then
+if [[ -f "${obsnum}" ]]; then
    output="${output}_%a"
    error="${error}_%a"
 fi
 
 chmod 755 "${script}"
 
-if [[ ${GXCOMPUTER} == "garrawarla" ]]
-then
+if [[ ${GXCOMPUTER} == "garrawarla" ]]; then
     CPUSPERTASK=1
     MEMPERTASK=24
-elif [[ ${GXCOMPUTER} == "setonix" ]]
-then 
+elif [[ ${GXCOMPUTER} == "setonix" ]]; then 
     CPUSPERTASK=5
     MEMPERTASK=20
 else
@@ -119,17 +110,14 @@ fi
 echo '#!/bin/bash' > ${script}.sbatch
 echo "srun --cpus-per-task=${CPUSPERTASK} --ntasks=1 --ntasks-per-node=1 singularity run ${GXCONTAINER} ${script}" >> ${script}.sbatch
 
-if [[ -n ${GXNCPULINE} ]]
-then
-    # autoflag only needs a single CPU core
+if [[ -n ${GXNCPULINE} ]]; then
     GXNCPULINE="--ntasks-per-node=1"
 fi
 
 sub="sbatch --begin=now+5minutes --export=ALL  --time=01:00:00 -M ${GXCOMPUTER} --mem=${MEMPERTASK}G --cpus-per-task=${CPUSPERTASK} --output=${output} --error=${error}"
 sub="${sub} ${GXNCPULINE} ${account} ${GXTASKLINE} ${jobarray} ${depend} ${queue} ${script}.sbatch"
 
-if [[ ! -z ${tst} ]]
-then
+if [[ -n ${tst} ]]; then
     echo "script is ${script}"
     echo "submit via:"
     echo "${sub}"
@@ -142,21 +130,18 @@ jobid=${jobid[3]}
 
 echo "Submitted ${script} as ${jobid} . Follow progress here:"
 
-for taskid in $(seq ${numfiles})
-    do
+for taskid in $(seq ${numfiles}); do
     # rename the err/output files as we now know the jobid
     obserror=$(echo "${error}" | sed -e "s/%A/${jobid}/" -e "s/%a/${taskid}/")
     obsoutput=$(echo "${output}" | sed -e "s/%A/${jobid}/" -e "s/%a/${taskid}/")
 
-    if [[ -f ${obsnum} ]]
-    then
+    if [[ -f ${obsnum} ]]; then
         obs=$(sed -n -e "${taskid}"p "${obsnum}")
     else
         obs=$obsnum
     fi
 
-    if [ "${GXTRACK}" = "track" ]
-    then
+    if [[ "${GXTRACK}" = "track" ]]; then
         # record submission
         ${GXCONTAINER} track_task.py queue --jobid="${jobid}" --taskid="${taskid}" --task='uvflag' --submission_time="$(date +%s)" \
                             --batch_file="${script}" --obs_id="${obs}" --stderr="${obserror}" --stdout="${obsoutput}"
