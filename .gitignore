@@ -4,6 +4,7 @@ db/database_configuration.py
 queue/*
 */*pyc
 *pyc
+_version.py
 .vscode
 data/*
 *.img

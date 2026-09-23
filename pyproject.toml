@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sea-pipe"
+dynamic = ["version"]
+description = "A Pipeline to Search for Exotic Activity."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "Kenil Ajudiya", email = "k.ajudiya@postgrad.curtin.edu.au" },
+]
+maintainers = [
+    { name = "Kenil Ajudiya", email = "k.ajudiya@postgrad.curtin.edu.au" },
+]
+license = "MIT"
+keywords = ["LPTs", "MWA", "Radio Astronomy", "Transient Search"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+
+    "License :: OSI Approved :: MIT License",
+
+    "Operating System :: POSIX :: Linux",
+
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+# Hatch configuration
+[tool.hatch]
+version.source = "vcs"
+
+build.hooks.vcs.version-file = "sea_src/_version.py"
+build.include = ["sea_src/**", "README.md", "LICENSE"]
+build.targets.wheel.packages = ["sea_src"]
