@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 190" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient (Deep Ocean Twilight) -->
+    <linearGradient id="bgSeaWave" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#042f2e" />
+      <stop offset="50%" stop-color="#082f49" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    
+    <!-- Sea & Signal Gradient (Teal to Cyan to Golden Star) -->
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#14b8a6" />
+      <stop offset="60%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+    
+    <!-- Glow Effect for Horizon / Star -->
+    <filter id="glowSeaWave" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="760" height="190" rx="16" fill="url(#bgSeaWave)" />
+
+  <!-- Graphic Icon Group (Left Side) - Sea Surface Waves & Horizon Star -->
+  <g transform="translate(85, 95)">
+    <!-- Horizon Line / Sky Glow -->
+    <line x1="-50" y1="-5" x2="50" y2="-5" stroke="#38bdf8" stroke-width="1" opacity="0.3" />
+    
+    <!-- Distant Wave Layer -->
+    <path d="M -50 10 Q -25 0 0 10 T 50 10" fill="none" stroke="url(#waveGrad)" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Midground Wave Layer -->
+    <path d="M -50 22 Q -20 10 10 22 T 50 22" fill="none" stroke="url(#waveGrad)" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+    
+    <!-- Foreground Rolling Sea Wave -->
+    <path d="M -55 35 Q -25 20 0 35 T 55 35" fill="none" stroke="url(#waveGrad)" stroke-width="4" stroke-linecap="round" filter="url(#glowSeaWave)"/>
+    
+    <!-- Exotic Transient Star / Signal Cresting the Waves -->
+    <circle cx="0" cy="-28" r="5.5" fill="#fbbf24" filter="url(#glowSeaWave)" />
+    <circle cx="0" cy="-28" r="2" fill="#ffffff" />
+    <path d="M 0 -42 L 0 -14 M -14 -28 L 14 -28" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  </g>
+
+  <!-- Typography (Right Side) -->
+  <!-- Main Title -->
+  <text x="175" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="40" fill="#f8fafc" letter-spacing="1">
+    SEA<tspan fill="#14b8a6">-pipe</tspan>
+  </text>
+  
+  <!-- Subtitle: Searching for Exotic Activity (Highlighting S.E.A.) -->
+  <text x="178" y="118" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="600" font-size="18" fill="#cbd5e1" letter-spacing="0.5">
+    <tspan fill="#14b8a6" font-weight="800">S</tspan>earching for <tspan fill="#14b8a6" font-weight="800">E</tspan>xotic <tspan fill="#14b8a6" font-weight="800">A</tspan>ctivity
+  </text>
+</svg>

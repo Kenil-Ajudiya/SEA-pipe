@@ -1,5 +1,7 @@
 # SEA-pipe: A Pipeline to Search for Exotic Activity
 
+![SEApipe_banner_logo.svg](logos/SEApipe_banner_logo.svg "SEA-pipe: A Pipeline to Search for Exotic Activity")
+
 SEA-pipe is a transient-search adaptation of the MWA processing workflow originally developed in the GLEAM-X pipeline. The upstream repository is the GLEAM-X pipeline at <https://github.com/GLEAM-X/GLEAM-X-pipeline>. This repository keeps the parts of that workflow that are relevant for searching for transient and variable activity in MWA observations, while dropping the broader survey-production and archive stages that are not required for this use case.
 
 The pipeline is designed for HPC environments and uses a containerised software stack together with SLURM job submission. It follows the same overall structure as the upstream pipeline: named stages are implemented as template scripts and generated job scripts, with the generated work scripts run inside the container context.
@@ -93,6 +95,9 @@ The convenience driver script `auto_process.sh` chains the common sequence toget
 
 ## Script descriptions
 
+<details>
+<summary><b>Click here to view the description</b></summary>
+
 ### `auto_process.sh`
 
 This is the high-level workflow driver for a typical transient-search run. It coordinates the main observation-processing sequence and can optionally fetch data, run autoflagging, calibration, source subtraction, self-calibration, post-imaging corrections, and transient filtering. It is designed to streamline the common end-to-end flow for a project while still allowing individual stages to be run separately when needed.
@@ -144,6 +149,8 @@ This is the core transient-imaging stage. It subtracts the deep clean model from
 ### `obs_tfilter.sh`
 
 This stage applies transient detection filtering to the residual data products produced by the transient imaging stage. The filters are designed to isolate candidate events and suppress artefacts, producing a cleaned candidate list or filtered image products for further inspection.
+
+</details>
 
 ## Notes
 
