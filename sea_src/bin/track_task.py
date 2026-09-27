@@ -258,9 +258,7 @@ def require(args, reqlist):
 
     return True
 
-
 if __name__ == "__main__":
-
     import argparse
 
     ps = argparse.ArgumentParser(description="track tasks")
@@ -273,32 +271,12 @@ if __name__ == "__main__":
     ps.add_argument("--finish_time", type=int, help="job finish time", default=None)
     ps.add_argument("--batch_file", type=str, help="batch file name", default=None)
     ps.add_argument("--obs_id", type=int, help="observation id", default=None)
-    ps.add_argument(
-        "--cal_id", type=int, help="observation id of calibration data", default=None
-    )
-    ps.add_argument(
-        "--batch_obs_ids",
-        type=int,
-        nargs="+",
-        help="collection of observation ids, used only for {0} directives".format(
-            BATCH_OBS_IDS_TASKS
-        ),
-        default=None,
-    )
+    ps.add_argument("--cal_id", type=int, help="observation id of calibration data", default=None)
+    ps.add_argument("--batch_obs_ids", type=int, nargs="+", help=f"collection of observation ids, used only for {BATCH_OBS_IDS_TASKS} directives", default=None)
     ps.add_argument("--stderr", type=str, help="standard error log", default=None)
     ps.add_argument("--stdout", type=str, help="standard out log", default=None)
-    ps.add_argument(
-        "--status",
-        type=str,
-        help="observation status, must belong to {0}".format(OBS_STATUS),
-        default=None,
-    )
-    ps.add_argument(
-        "--subband",
-        type=str,
-        help="subband of images that are being mosaiced together",
-        default=None,
-    )
+    ps.add_argument("--status", type=str, help=f"observation status, must belong to {OBS_STATUS}", default=None)
+    ps.add_argument("--subband", type=str, help="subband of images that are being mosaiced together", default=None)
 
     args = ps.parse_args()
 
@@ -306,33 +284,8 @@ if __name__ == "__main__":
     args.host_cluster = os.environ["GXCLUSTER"]
 
     if args.directive.lower() == "queue":
-        require(
-            args,
-            [
-                "jobid",
-                "taskid",
-                "host_cluster",
-                "submission_time",
-                "obs_id",
-                "user",
-                "batch_file",
-                "stderr",
-                "stdout",
-                "task",
-            ],
-        )
-        queue_job(
-            args.jobid,
-            args.taskid,
-            args.host_cluster,
-            args.submission_time,
-            args.obs_id,
-            args.user,
-            args.batch_file,
-            args.stderr,
-            args.stdout,
-            args.task,
-        )
+        require(args, ["jobid", "taskid", "host_cluster", "submission_time", "obs_id", "user", "batch_file", "stderr", "stdout", "task"])
+        queue_job(args.jobid, args.taskid, args.host_cluster, args.submission_time, args.obs_id, args.user, args.batch_file, args.stderr, args.stdout, args.task)
 
     elif args.directive.lower() == "start":
         require(args, ["jobid", "taskid", "host_cluster", "start_time"])
@@ -355,27 +308,8 @@ if __name__ == "__main__":
         observation_calibrator_id(args.obs_id, args.cal_id)
 
     elif args.directive.lower() == "queue_mosaic":
-        require(
-            args,
-            [
-                "jobid",
-                "taskid",
-                "host_cluster",
-                "submission_time",
-                "batch_obs_ids",
-                "user",
-                "subband",
-            ],
-        )
-        queue_mosaic(
-            args.batch_obs_ids,
-            args.jobid,
-            args.taskid,
-            args.host_cluster,
-            args.submission_time,
-            args.user,
-            args.subband,
-        )
+        require(args, ["jobid", "taskid", "host_cluster", "submission_time", "batch_obs_ids", "user", "subband"])
+        queue_mosaic(args.batch_obs_ids, args.jobid, args.taskid, args.host_cluster, args.submission_time, args.user, args.subband)
 
     elif args.directive.lower() == "start_mosaic":
         require(args, ["jobid", "taskid", "host_cluster", "start_time"])
@@ -390,6 +324,4 @@ if __name__ == "__main__":
         fail_mosaic(args.jobid, args.taskid, args.host_cluster, args.finish_time)
 
     else:
-        print(
-            "I don't know what you are asking; please include a queue/start/finish/fail directive"
-        )
+        print("I don't know what you are asking; please include a queue/start/finish/fail directive")
