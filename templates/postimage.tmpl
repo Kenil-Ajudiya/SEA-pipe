@@ -1,8 +1,7 @@
-#! /bin/bash -l
+#! /bin/bash
 
 set -x
 
-pipeuser=PIPEUSER
 obsnum=OBSNUM
 
 # If obsnum is a file, then we are in an array job
@@ -126,7 +125,7 @@ do
 
         BANE --cores 1 --compress --noclobber "${obsnum}_deep-${subchan}-image-pb.fits"
         # TODO: Replace the redirection
-        aegean  --autoload --cores=${GXNPCPUS} --table="./${obsnum}_deep-${subchan}-image-pb.fits" "./${obsnum}_deep-${subchan}-image-pb.fits" > >(tee -a "${obsnum}_deep-${subchan}_aegean.log") 2> >(tee -a "${obsnum}_deep-${subchan}_aegean.log" >&2)
+        aegean  --autoload --table="./${obsnum}_deep-${subchan}-image-pb.fits" "./${obsnum}_deep-${subchan}-image-pb.fits" > >(tee -a "${obsnum}_deep-${subchan}_aegean.log") 2> >(tee -a "${obsnum}_deep-${subchan}_aegean.log" >&2)
     fi
     nsrc=$(grep "INFO found" "${obsnum}_deep-${subchan}_aegean.log" | head -1 | awk '{print $3}')
     if [[ $nsrc -lt $minsrcs ]]; then
@@ -170,7 +169,6 @@ do
             --vm 10 \
             --progress \
             --testimage \
-            --cores ${GXNPCPUS} \
             --signal peak_flux_1 \
             --enforce-min-srcs 100
             # --signal peak_flux --noise local_rms --SNR 10
@@ -240,7 +238,7 @@ do
         
         # rerun the source-finding -- don't save to the log this time as the numbers should not have changed
         if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp_comp.fits" ]]; then
-            aegean --autoload --cores=${GXNPCPUS} --table="./${obsnum}_deep-${subchan}-image-pb_warp.fits" "./${obsnum}_deep-${subchan}-image-pb_warp.fits"
+            aegean --autoload --table="./${obsnum}_deep-${subchan}-image-pb_warp.fits" "./${obsnum}_deep-${subchan}-image-pb_warp.fits"
         fi
         if [[ ! -e "${obsnum}_deep-${subchan}-image-pb_warp_weight.fits" ]]; then
             # Generate a weight map for mosaicking

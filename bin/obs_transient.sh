@@ -16,8 +16,6 @@ echo "obs_transient.sh [-d dep] [-p project] [-z] [-t] obsnum
 exit 1;
 }
 
-pipeuser="${GXUSER}"
-
 #initial variables
 dep=
 tst=
@@ -50,7 +48,6 @@ done
 shift  "$(($OPTIND -1))"
 obsnum=$1
 
-queue="-p ${GXSTANDARDQ}"
 base="${GXSCRATCH}/$project"
 code="${GXBASE}"
 
@@ -66,10 +63,6 @@ if [[ -n ${dep} ]]; then
     else
         depend="--dependency=afterok:${dep}"
     fi
-fi
-
-if [[ -n ${GXACCOUNT} ]]; then
-    account="--account=${GXACCOUNT}"
 fi
 
 # Establish job array options
@@ -94,8 +87,7 @@ script="${GXSCRIPT}/transient_${obsnum}.sh"
 cat "${GXBASE}/templates/transient.tmpl" | sed -e "s:OBSNUM:${obsnum}:g" \
                                  -e "s:BASEDIR:${base}:g" \
                                  -e "s:RAMCOPY:${ramcopy}:g" \
-                                 -e "s:DEBUG:${debug}:g" \
-                                 -e "s:PIPEUSER:${pipeuser}:g" > "${script}"
+                                 -e "s:DEBUG:${debug}:g" > "${script}"
 
 output="${GXLOG}/transient_${obsnum}.o%A"
 error="${GXLOG}/transient_${obsnum}.e%A"
@@ -107,12 +99,21 @@ fi
 
 chmod 755 "${script}"
 
-# sbatch submissions need to start with a shebang
-echo '#!/bin/bash' > ${script}.sbatch
-echo "srun --cpus-per-task=${GXNCPUS} --ntasks=1 --ntasks-per-node=1 singularity run ${GXCONTAINER} ${script}" >> ${script}.sbatch
+# DEVELOPER's NOTES:
+# In the SLURM job script, start with a fresh login shell and source the profile to ensure that the environment is set up correctly.
+# From the perspective of SLURM, this is a very simple job script with a single task.
+# If there are multiple obsids to process, the job script will be submitted as a job array (with the --array option), with one task for each obsid.
+# In a job array, each task is equivalent to a single job submission, and has a unique SLURM_JOB_ID. Only one of the array tasks will have SLURM_JOB_ID the same as SLURM_ARRAY_JOB_ID.
+# If it is not a job array, SLURM_ARRAY_* environment variables will be unset (i.e. empty).
+# In any case, the sbatch command need only specify the resources required for a single task (or a single obsid) since each obsid will be processed as a SLURM job.
+# Moreover, the SLURM environment variables will be set automatically by SLURM in the job script for each task, and the resources allocated to that task need not be specified explicitly to the srun command.
+# Precedence order for resource allocation requests (using the sbatch command) is: command line options > SLURM environment variables > SLURM directives in the header of the job script.
+echo '#!/bin/bash --login' > "${script}_job.sh"
+echo "source ${GXPROFILE}" >> "${script}_job.sh"
+echo "export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom)" >> "${script}_job.sh"
+echo "srun singularity run ${GXCONTAINER} ${script}" >> "${script}_job.sh"
 
-sub="sbatch --begin=now+5minutes --export=ALL  ${maxtime} --mem=${GXABSMEMORY}G -M ${GXCOMPUTER} --output=${output} --error=${error}"
-sub="${sub} ${GXNCPULINE} ${account} ${GXTASKLINE} ${jobarray} ${depend} ${queue} ${script}.sbatch"
+sub="sbatch --begin=now+5minutes ${maxtime} --mem=${GXBASEMEMORY}G --cpus-per-task=${GXNCPUS} ${GXTASKLINE} --clusters=${GXCLUSTER} --account=${GXACCOUNT} --partition=${GXSTANDARDQ} --job-name=transient_${obsnum} ${jobarray} --output=${output} --error=${error} ${depend} ${script}_job.sh"
 
 if [[ -n ${tst} ]]; then
     echo "script is ${script}"

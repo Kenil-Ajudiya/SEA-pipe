@@ -1,8 +1,7 @@
-#! /bin/bash -l
+#! /bin/bash
 
 set -x
 
-pipeuser=PIPEUSER
 obsnum=OBSNUM
 ramcopy=RAMCOPY
 
@@ -168,6 +167,7 @@ fi
 if [[ ! -e "${obsnum}_template.fits" ]]; then
     echo "Creating template image for ${obsnum}."
     wsclean \
+        -abs-mem ${GXMEMORY} \
         -mgain 1.0 \
         -nmiter 1 \
         -niter 0 \
@@ -208,6 +208,7 @@ done
 set -o pipefail
 # Deep clean (for pipeline)
 wsclean \
+    -abs-mem ${GXMEMORY} \
     $multiscale \
     $scalebias \
     -nmiter 3 \

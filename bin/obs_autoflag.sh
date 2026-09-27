@@ -2,9 +2,8 @@
 
 usage()
 {
-echo "obs_autoflag.sh [-p project] [-a account] [-d dep] [-t] obsnum
+echo "obs_autoflag.sh [-p project] [-d dep] [-t] obsnum
   -p project : project, no default
-  -a account : account, defaults to GXACCOUNT environment variable
   -d dep     : job number for dependency (afterok)
   -t         : test. Don't submit job, just make the batch file
                and then return the submission command
@@ -13,17 +12,12 @@ echo "obs_autoflag.sh [-p project] [-a account] [-d dep] [-t] obsnum
 exit 1;
 }
 
-pipeuser="${GXUSER}"
-
 dep=
 tst=
 
 # parse args and set options
 while getopts ':td:a:p:' OPTION; do
     case "$OPTION" in
-	a)
-        account="--account=${OPTARG}"
-        ;;
     d)
 	    dep=${OPTARG}
 	    ;;
@@ -45,13 +39,6 @@ obsnum=$1
 # if obsid or project are empty then just print help
 if [[ -z ${obsnum} ]] || [[ -z ${project} ]]; then
     usage
-fi
-
-if [[ -z ${account} ]] && [[ -n ${GXACCOUNT} ]]; then
-    account="--account=${GXACCOUNT}"
-else
-    echo "No account specified. Specify with -a or set GXACCOUNT environment variable. Exiting."
-    exit 1
 fi
 
 # Establish job array options
@@ -78,9 +65,7 @@ fi
 script="${GXSCRIPT}/autoflag_${obsnum}.sh"
 
 cat "${GXBASE}/templates/autoflag.tmpl" | sed -e "s:OBSNUM:${obsnum}:g" \
-                                     -e "s:DATADIR:${datadir}:g" \
-                                     -e "s:HOST:${GXCOMPUTER}:g" \
-                                     -e "s:PIPEUSER:${pipeuser}:g" > "${script}"
+                                     -e "s:DATADIR:${datadir}:g" > "${script}"
 
 
 output="${GXLOG}/autoflag_${obsnum}.o%A"
@@ -92,12 +77,21 @@ fi
 
 chmod 755 "${script}"
 
-# sbatch submissions need to start with a shebang
-echo '#!/bin/bash' > ${script}.sbatch
-echo "srun --cpus-per-task=1 --ntasks=1 --ntasks-per-node=1 singularity run ${GXCONTAINER} ${script}" >> ${script}.sbatch
+# DEVELOPER's NOTES:
+# In the SLURM job script, start with a fresh login shell and source the profile to ensure that the environment is set up correctly.
+# From the perspective of SLURM, this is a very simple job script with a single task.
+# If there are multiple obsids to process, the job script will be submitted as a job array (with the --array option), with one task for each obsid.
+# In a job array, each task is equivalent to a single job submission, and has a unique SLURM_JOB_ID. Only one of the array tasks will have SLURM_JOB_ID the same as SLURM_ARRAY_JOB_ID.
+# If it is not a job array, SLURM_ARRAY_* environment variables will be unset (i.e. empty).
+# In any case, the sbatch command need only specify the resources required for a single task (or a single obsid) since each obsid will be processed as a SLURM job.
+# Moreover, the SLURM environment variables will be set automatically by SLURM in the job script for each task, and the resources allocated to that task need not be specified explicitly to the srun command.
+# Precedence order for resource allocation requests (using the sbatch command) is: command line options > SLURM environment variables > SLURM directives in the header of the job script.
+echo '#!/bin/bash --login' > "${script}_job.sh"
+echo "source ${GXPROFILE}" >> "${script}_job.sh"
+echo "export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom)" >> "${script}_job.sh"
+echo "srun singularity run ${GXCONTAINER} ${script}" >> "${script}_job.sh"
 
-sub="sbatch --begin=now+2minutes --export=ALL ${account} --time=01:00:00 --partition=${GXSTANDARDQ} --job-name=autoflag_${obsnum} --output=${output} --error=${error}"
-sub="${sub} ${jobarray} ${depend} ${script}.sbatch"
+sub="sbatch --begin=now+2minutes --time=01:00:00 --mem=10G --cpus-per-task=1 ${GXTASKLINE} --clusters=${GXCLUSTER} --account=${GXACCOUNT} --partition=${GXSTANDARDQ} --job-name=autoflag_${obsnum} ${jobarray} --output=${output} --error=${error} ${depend} ${script}_job.sh"
 
 if [[ -n ${tst} ]]; then
     echo "script is ${script}"

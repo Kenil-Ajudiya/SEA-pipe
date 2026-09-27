@@ -1,8 +1,7 @@
-#!/bin/bash -l
+#!/bin/bash
 
 set -x
 
-pipeuser=PIPEUSER
 obsnum=OBSNUM
 ramcopy=RAMCOPY
 
@@ -26,7 +25,7 @@ echo "taskid: ${taskid}"
 
 test_fail() {
 if [[ $1 != 0 ]]; then
-    singularity run ${GXCONTAINER} track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+    track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
     exit "$1"
 fi
 }
@@ -64,7 +63,7 @@ minuv=75
 ion=IONOTEST
 
 # start
-singularity run ${GXCONTAINER} track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
 
 cd "${datadir}/${obsnum}" || exit
 
@@ -83,28 +82,23 @@ else
     mst=${obsnum}.ms
 fi
 
-calibrator=$(singularity run $GXCONTAINER pyhead.py -p CALIBSRC "$metafits" | awk '{print $3}' )
+calibrator=$(pyhead.py -p CALIBSRC "$metafits" | awk '{print $3}' )
 echo "Calibrator is $calibrator"
 
 echo "Running infield calibration for $obsnum"
-RA=$(singularity run $GXCONTAINER pyhead.py -p RA "$metafits" | awk '{print $3}' )
-Dec=$(singularity run $GXCONTAINER pyhead.py -p DEC "$metafits" | awk '{print $3}' )
-chan=$(singularity run $GXCONTAINER pyhead.py -p CENTCHAN "$metafits" | awk '{print $3}' )
-
-if [[ ! -e "${obsnum}_local_gleam_model.txt" ]]; then
-    ln -s ${catfile} "${obsnum}_local_gleam_model.txt"
-fi
-calmodel="${obsnum}_local_gleam_model.txt"
+RA=$(pyhead.py -p RA "$metafits" | awk '{print $3}' )
+Dec=$(pyhead.py -p DEC "$metafits" | awk '{print $3}' )
+chan=$(pyhead.py -p CENTCHAN "$metafits" | awk '{print $3}' )
 
 # Check whether the phase centre has already changed
 # Calibration will fail if it has, so measurement set must be shifted back to its original position
-current=$(singularity run $GXCONTAINER chgcentre "${mst}") 
+current=$(chgcentre "${mst}") 
 
 if [[ $current == *"shift"* ]]; then
     echo "Detected that this measurement set has undergone a denormal shift; this must be undone before calibration."
-    coords=$(singularity run $GXCONTAINER calc_optimum_pointing.py --metafits "${metafits}")
+    coords=$(calc_optimum_pointing.py --metafits "${metafits}")
     echo "Optimally shifting co-ordinates of measurement set to $coords, without zenith shiftback."
-    srun singularity run ${GXCONTAINER} chgcentre \
+    chgcentre \
             "${mst}" \
             ${coords}
 else
@@ -123,14 +117,13 @@ maxuvm=$(echo "390000 / (${chan} + 11)" | bc -l)
 if [[ -n $ion ]]; then
     echo "Performing ionospheric triage."
 
-    ntimesteps=`singularity run -B $PWD ${GXCONTAINER} taql "calc count([select distinct(TIME) from ${mst}])"`
+    ntimesteps=`taql "calc count([select distinct(TIME) from ${mst}])"`
     # Break the observation into 3 chunks of ntimesteps/3 timesteps each.
     chunk_size=$(echo "$ntimesteps / 3" | bc)
 
     # Ionospheric triage
     solutions1="${calmodel%%.txt}_solutions_ts1.bin"
-    export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom)
-    srun -N 1 -m block:block:block singularity run $GXCONTAINER hyperdrive \
+    hyperdrive \
         di-calibrate \
         --max-iterations 500 \
         --timesteps $(eval echo {0..$(echo "$chunk_size - 1" | bc)}) \
@@ -142,7 +135,7 @@ if [[ -n $ion ]]; then
         -d "${mst}" "${obsnum}.metafits" \
         -s ${calmodel}
     
-    singularity run $GXCONTAINER hyperdrive \
+    hyperdrive \
         solutions-plot \
         --ref-tile ${refant} \
         --max-amp 2 \
@@ -150,8 +143,7 @@ if [[ -n $ion ]]; then
         "${solutions1}" 
 
     solutions="${calmodel%%.txt}_solutions_ts2.bin"
-    export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom)
-    srun -N 1 -m block:block:block singularity run $GXCONTAINER hyperdrive \
+    hyperdrive \
         di-calibrate \
         --timesteps $(eval echo {$chunk_size..$(echo "2 * $chunk_size - 1" | bc)}) \
         --max-iterations 500 \
@@ -163,7 +155,7 @@ if [[ -n $ion ]]; then
         -d "${mst}" "${obsnum}.metafits" \
         -s ${calmodel}
 
-    singularity run $GXCONTAINER hyperdrive \
+    hyperdrive \
         solutions-plot \
         --ref-tile ${refant} \
         --max-amp 2 \
@@ -171,8 +163,7 @@ if [[ -n $ion ]]; then
         "${solutions}"
 
     solutions="${calmodel%%.txt}_solutions_ts3.bin"
-    export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom)
-    srun -N 1 -m block:block:block singularity run $GXCONTAINER hyperdrive \
+    hyperdrive \
         di-calibrate \
         --timesteps $(eval echo {$(echo "2 * $chunk_size" | bc)..$(echo "$ntimesteps - 1" | bc)}) \
         --max-iterations 500 \
@@ -184,7 +175,7 @@ if [[ -n $ion ]]; then
         -d "${mst}" "${obsnum}.metafits" \
         -s ${calmodel}
 
-    singularity run $GXCONTAINER hyperdrive \
+    hyperdrive \
         solutions-plot \
         --ref-tile ${refant} \
         --max-amp 2 \
@@ -193,20 +184,17 @@ if [[ -n $ion ]]; then
 
     echo "Ionospheric calibration finished. Creating plots and statistics. "
 
-    singularity run ${GXCONTAINER} python ${GXBASE}/gleam_x/bin/aocal_diff.py --metafits="${metafits}" --names --lastsol "${solutions}" "${solutions1}" --refant="${refant}"
+    python ${GXBASE}/gleam_x/bin/aocal_diff.py --metafits="${metafits}" --names --lastsol "${solutions}" "${solutions1}" --refant="${refant}"
     if [[ -n ${GXDBHOST} ]] && [[ -n ${GXDBPORT} ]] && [[ -n ${GXDBUSER} ]] && [[ -n ${GXDBPASS} ]]; then
-        singularity run ${GXCONTAINER} iono_update.py --ionocsv "${obsnum}_ionodiff.csv"
+        iono_update.py --ionocsv "${obsnum}_ionodiff.csv"
     fi
 fi
 
 # At the moment, assume that the ionosphere is OK, and derive some real solutions
-solutions="${obsnum}_${calmodel%%.txt}_solutions_initial.bin"
-# Remove duplicate obsnum
-solutions="${solutions/${obsnum}_${obsnum}_/${obsnum}_}"
+solutions="${obsnum}_local_gleam_model_solutions_initial.bin"
 
-# # calibrate
-export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom)
-srun -N 1 -m block:block:block singularity run $GXCONTAINER hyperdrive \
+# calibrate
+hyperdrive \
     di-calibrate \
     --uvw-min "${minuv}lambda" \
     --max-iterations 500 \
@@ -215,15 +203,15 @@ srun -N 1 -m block:block:block singularity run $GXCONTAINER hyperdrive \
     --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
     --outputs "${solutions}" \
     -d "${mst}" "${obsnum}.metafits" \
-    -s ${calmodel}
+    -s ${catfile}
 test_fail $?
 
 # Create a version divided through by the reference antenna, so that all observations have the same relative XY phase, allowing polarisation calibration solutions to be transferred
 # This also sets the cross-terms to zero by default
-singularity run ${GXCONTAINER} aocal_phaseref.py "${solutions}" "${solutions%.bin}_ref.bin" "${refant}" --xy -2.806338586067941065e+01 --dxy -4.426533296449057023e-07  --ms "${obsnum}.ms"
+aocal_phaseref.py "${solutions}" "${solutions%.bin}_ref.bin" "${refant}" --xy -2.806338586067941065e+01 --dxy -4.426533296449057023e-07  --ms "${obsnum}.ms"
 
 # plot calibration solutions
-singularity run $GXCONTAINER hyperdrive \
+hyperdrive \
     solutions-plot \
     --ref-tile ${refant} \
     --max-amp 2 \
@@ -235,7 +223,7 @@ test_fail $?
 
 # Test to see if the calibration solution meets minimum quality control. At the moment
 # this is a simple check based on the number of flagged solutions
-result=$(singularity run $GXCONTAINER check_assign_solutions.py -t "${fraction}" check "${solutions%.bin}_ref.bin")
+result=$(check_assign_solutions.py -t "${fraction}" check "${solutions%.bin}_ref.bin")
 if echo "${result}" | grep -q fail; then
     mv "${solutions%.bin}_ref.bin" "${solutions%.bin}_ref_failed.bin"
     test_fail 1
@@ -246,4 +234,4 @@ if [[ -n $ramcopy ]]; then
     rm -rf $tmpdir
 fi
 
-singularity run ${GXCONTAINER} track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"

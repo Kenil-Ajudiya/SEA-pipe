@@ -1,8 +1,7 @@
-#! /bin/bash -l
+#! /bin/bash
 
 echo $SLURM_JOB_NAME
 
-pipeuser=PIPEUSER
 obsnum=OBSNUM
 datadir=DATADIR
 
@@ -24,26 +23,15 @@ echo "taskid: ${taskid}"
 
 function test_fail {
 if [[ $1 != 0 ]]; then
-    singularity run ${GXCONTAINER} track_task.py fail --jobid=${jobid} --taskid=${taskid} --finish_time=`date +%s`
+    track_task.py fail --jobid=${jobid} --taskid=${taskid} --finish_time=`date +%s`
     exit $1
 fi
 }
 
 # start
-singularity run ${GXCONTAINER} track_task.py start --jobid=${jobid} --taskid=${taskid} --start_time=`date +%s`
-
-#cores=`grep -P '^core id\t' /proc/cpuinfo  | wc -l`
+track_task.py start --jobid=${jobid} --taskid=${taskid} --start_time=`date +%s`
 
 cd "${datadir}/${obsnum}" || exit 1
-
-#metafits="${obsnum}.metafits"
-#if [[ ! -e ${metafits} ]]
-#then
-#    wget "http://mwa-metadata01.pawsey.org.au/metadata/fits?obs_id=${obsnum}" -O ${metafits}
-#    test_fail $?
-#fi
-
-# Set up telescope-configuration-dependent options
 
 # Tiles 72 and 76 intermittently dodgy in 2013/4
 if [[ ${obsnum} -ge 1060000000 ]] && [[ ${obsnum} -le 1070000000 ]]; then
@@ -260,8 +248,7 @@ fi
 
 if [[ -n ${flags} ]]; then
     echo "Flagging tiles $flags"
-    export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom)
-    srun -N $SLURM_JOB_NUM_NODES -n $SLURM_NTASKS -c $SLURM_CPUS_PER_TASK singularity run ${GXCONTAINER} flagantennae ${obsnum}.ms $flags
+    flagantennae ${obsnum}.ms $flags
 fi
 
-singularity run ${GXCONTAINER} track_task.py finish --jobid=${jobid} --taskid=${taskid} --finish_time=`date +%s`
+track_task.py finish --jobid=${jobid} --taskid=${taskid} --finish_time=`date +%s`

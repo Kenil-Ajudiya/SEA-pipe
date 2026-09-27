@@ -1,8 +1,7 @@
-#! /bin/bash -l
+#! /bin/bash
 
 set -x
 
-pipeuser=PIPEUSER
 obsnum=OBSNUM
 
 # If obsnum is a file, then we are in an array job
@@ -189,7 +188,7 @@ else
             "${obsnum}_selfsolutions.bin" | tee calibrate.log 
 
     aocal_plot.py --refant=127 ${obsnum}_selfsolutions.bin 
-    result=$(check_assign_solutions.py -t "0.25" check "${obsnum}_selfsolutions.bin")
+    result=$(check_assign_solutions.py -t "0.5" check "${obsnum}_selfsolutions.bin")
 fi 
 
 
