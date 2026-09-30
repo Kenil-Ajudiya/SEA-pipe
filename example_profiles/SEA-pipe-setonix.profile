@@ -45,7 +45,7 @@ export GXMEMORY=180             # Memory limit (in GB) for programs like 'wsclea
 # See https://pawsey.atlassian.net/wiki/spaces/US/pages/51927426/Example+Slurm+Batch+Scripts+for+Setonix+on+CPU+Compute+Nodes for more details on FI_CXI_DEFAULT_VNI usage.
 export GXTASKLINE="--nodes=1 --ntasks=1"        # This is passed to all SLURM sbatch calls.
 
-export GXLOG="${GXBASE}/log_${GXCLUSTER}"       # Path to output task logs, e.g. ${GXBASE}/queue/log_${GXCLUSTER}. It is recommended that this is cluster specific. 
+export GXLOG="${GXBASE}/SEA-pipe_logs"          # Path to store log files, e.g. ${GXBASE}/SEA-pipe_logs. Job submission logs and SLURM task logs are stored here in separate directories.
 export GXSCRIPT="${GXBASE}/script_${GXCLUSTER}" # Path to place generated execution scripts. e.g. "${GXBASE}/script_${GXCLUSTER}". It is recommended that this is cluster specific.
 export GXTRACK='no-track'                       # Directive to inform task tracking for meta-database. 'track' will track task progression. Anything else will disable tracking. 
 

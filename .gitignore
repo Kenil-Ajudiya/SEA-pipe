@@ -13,7 +13,7 @@ data/*
 *.json
 SEA-pipe-setonix.profile
 script_setonix/*
-log_setonix/*
+SEA-pipe_logs/*
 old_logs/*
 ssh_keys/*
 pb_lookup.tar.gz

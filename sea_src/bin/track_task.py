@@ -280,7 +280,7 @@ if __name__ == "__main__":
 
     args = ps.parse_args()
 
-    args.user = os.environ["GXUSER"]
+    args.user = os.environ["GXDBUSER"]
     args.host_cluster = os.environ["GXCLUSTER"]
 
     if args.directive.lower() == "queue":
