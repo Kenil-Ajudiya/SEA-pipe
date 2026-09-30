@@ -1,69 +1,64 @@
 #! /bin/bash
 
-obsnum=OBSNUM
+set -x
+
+obsinp=OBSINP
 calid=CALID
 selfcal=SELFCAL
-
-# If obsnum is a file, then we are in an array job
-if [[ -f ${obsnum} ]]; then
-    taskid=${SLURM_ARRAY_TASK_ID}
-    jobid=${SLURM_ARRAY_JOB_ID}
-
-    echo "obsfile ${obsnum}"
-    obsnum=$(sed -n -e "${SLURM_ARRAY_TASK_ID}"p "${obsnum}")
-    echo "apply_cal obsid ${obsnum}"
-else
-    taskid=1
-    jobid=${SLURM_JOB_ID}
-fi
-
-# If obsnum is a file, then we are in an array job
-if [[ -f ${calid} ]]; then
-    echo "calid file is ${calid}"
-    calid=$(sed -n -e "${taskid}"p "${calid}")
-    echo "apply_cal calid ${calid}"
-fi
-
-echo "jobid: ${jobid}"
-echo "taskid: ${taskid}"
-
-function test_fail {
-if [[ $1 != 0 ]]; then
-    track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
-    exit "$1"
-fi
-}
-
-base=BASEDIR
+project_dir=PROJECT_DIR
 debug=DEBUG
 
-# apply calibration
-track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+# If obsinp is a file, then we are in an array job
+if [[ -f "${obsinp}" ]]; then
+    taskid="${SLURM_ARRAY_TASK_ID}"
+    jobid="${SLURM_ARRAY_JOB_ID}"
+    obsid="$(sed -n -e ${SLURM_ARRAY_TASK_ID}p ${obsinp})"
+else
+    taskid=1
+    jobid="${SLURM_JOB_ID}"
+    obsid="${obsinp}"
+fi
 
-cd "${base}/${obsnum}" || exit
-metafits="${obsnum}.metafits"
+# If calid is a file, then we are in an array job
+if [[ -f "${calid}" ]]; then
+    calid=$(sed -n -e "${taskid}"p "${calid}")
+fi
+
+function test_fail {
+    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
+        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        exit "$1"
+    fi
+}
+
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+fi
+
+cd "${project_dir}/${obsid}" || exit
+metafits="${obsid}.metafits"
 
 if [[ -n $selfcal ]]; then 
-    calfile="${base}/${calid}/${calid}_selfsolutions.bin"
+    calfile="${project_dir}/${calid}/${calid}_selfsolutions.bin"
     # Checking if there is a gross sidelobe: 
-    if [[ ! -e "${obsnum}_beamlobes.txt" ]]; then
-        get_mwa_pb_lobes.py ${metafits} -mS > ${obsnum}_beamlobes.txt
+    if [[ ! -e "${obsid}_beamlobes.txt" ]]; then
+        get_mwa_pb_lobes.py ${metafits} -mS > ${obsid}_beamlobes.txt
     else
         echo "Already have the beam, not recalculating"
     fi 
 
 
-    if [[ $(cat ${obsnum}_beamlobes.txt | wc -l ) -eq 1 ]]; then 
-        ra_sidelobe=$(cat ${obsnum}_beamlobes.txt | awk '{print $2}')
-        dec_sidelobe=$(cat ${obsnum}_beamlobes.txt | awk '{print $3}')
+    if [[ $(cat ${obsid}_beamlobes.txt | wc -l ) -eq 1 ]]; then 
+        ra_sidelobe=$(cat ${obsid}_beamlobes.txt | awk '{print $2}')
+        dec_sidelobe=$(cat ${obsid}_beamlobes.txt | awk '{print $3}')
     else
         echo "No major sidelobe, good stuff"
         self="False"
     fi 
 
-    get_mwa_pb_lobes.py ${metafits} -mM > ${obsnum}_mainlobes.txt
-    ra_mainlobe=$(cat ${obsnum}_mainlobes.txt | awk '{print $2}')
-    dec_mainlobe=$(cat ${obsnum}_mainlobes.txt | awk '{print $3}')
+    get_mwa_pb_lobes.py ${metafits} -mM > ${obsid}_mainlobes.txt
+    ra_mainlobe=$(cat ${obsid}_mainlobes.txt | awk '{print $2}')
+    dec_mainlobe=$(cat ${obsid}_mainlobes.txt | awk '{print $3}')
 
     # Check if crab or cyg is in the main fov
     ateam_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe})
@@ -82,10 +77,8 @@ if [[ -n $selfcal ]]; then
         echo "Either there is a gross sidelobe or Crab/CygA is in the mainlobe, carrying on with applying the selfcal"
     fi 
 else
-    calfile="${base}/${calid}/${calid}_local_gleam_model_solutions_initial_ref.bin"
+    calfile="${project_dir}/${calid}/${calid}_local_gleam_model_solutions_initial_ref.bin"
 fi 
-
-
 
 if [[ ! -e "${calfile}" ]]; then
     echo "Could not find calibrator file ${calid}"
@@ -95,28 +88,16 @@ fi
 
 echo "Calibration file is ${calfile}"
 
-# If in debugging mode, apply to the CORRECTED_DATA column
-# if [[ -n $debug ]]
-# then 
-#     hyperdrive \
-#     solutions-apply \
-    
-
-# fi 
-# If in debugging mode, apply to the CORRECTED_DATA column
-if [[ -n $debug ]]; then
-    applysolutions \
-                ${obsnum}.ms \
-                "${calfile}"
-# If in production mode, apply to the DATA column
-else
-    applysolutions \
-                -nocopy \
-                ${obsnum}.ms \
-                "${calfile}"
+if [[ -n "${debug}" ]]; then # If in debugging mode, apply to the CORRECTED_DATA column
+    nocopy=
+else # If in production mode, apply to the DATA column
+    nocopy="-nocopy"
 fi
+applysolutions "${nocopy}" "${obsid}.ms" "${calfile}"
 
 test_fail $?
 
-track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
-track_task.py obs_calibrator --obs_id "${obsnum}" --cal_id "${calid}"
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+    track_task.py obs_calibrator --obs_id "${obsid}" --cal_id "${calid}"
+fi

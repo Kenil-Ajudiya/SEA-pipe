@@ -2,54 +2,42 @@
 
 set -x
 
-echo "${GXBASE}"
-
-base=BASEDIR
-obslist=OBSLIST
-stem=STEM
-tres=TRES
-fres=FRES
+project_dir=PROJECT_DIR
+obsinp=OBSINP
 resubmit=RESUBMIT
 
-if [[ ${resubmit} == 1 ]]; then
+if [[ -n "${resubmit}" ]]; then
     allow_resubmit="--allow-resubmit"
 else
     allow_resubmit=""
 fi
 
-# start download
-cd "${base}" || exit 1
-list=$(awk '{print substr($1,8,10)}' < "${obslist}_manta.tmp")
-n=1
-for obsnum in $list; do
-    track_task.py start --jobid="${SLURM_JOBID}" --taskid=$n --start_time="$(date +%s)"
-    ((n+=1))
-done
+# Start download
+cd "${project_dir}" || exit 1
 
-export SSL_VERIFY=0
-mwa_client ${allow_resubmit} --csv="${obslist}_manta.tmp" --dir="${base}"
+obsid_array=$(awk '{print substr($1,8,10)}' < "${obsinp}_manta.tmp")
+
+if [[ "${GXTRACK}" == "track" ]]; then
+    for i in $(seq 1 "${#obsid_array[@]}"); do
+        track_task.py start --jobid="${SLURM_JOBID}" --taskid=${i} --start_time="$(date +%s)"
+    done
+fi
+
+mwa_client "${allow_resubmit}" --csv="${obsinp}_manta.tmp" --dir="${project_dir}"
 
 n=1
-for obsnum in $list; do
-    # The mwa_client will download and untar the data in ${base}/${jobid}/${obsnum}.ms, where jobid is the ASVO jobid.
-    # Move the data to ${base}/${obsnum}/${obsnum}.ms to be consistent with the previous download method.
-    obs_data_ms=$(find ${base} -name "${obsnum}.ms" -type d) # obs_data_ms will be ${base}/${jobid}/${obsnum}.ms if the download was successful, or empty if not.
+for obsid in $obsid_array; do
+    # The mwa_client will download and untar the data in ${project_dir}/${jobid}/${obsid}.ms, where jobid is the ASVO jobid.
+    # Move the data to ${project_dir}/${obsid}/${obsid}.ms to be consistent with the previous download method.
+    obs_data_ms=$(find ${project_dir} -name "${obsid}.ms" -type d) # obs_data_ms will be ${project_dir}/${jobid}/${obsid}.ms if the download was successful, or empty if not.
 
     if [[ ! -e "${obs_data_ms}" ]]; then
-        echo "The mwa_client failed to download data for obsid ${obsnum}."
-        track_task.py fail --jobid="${SLURM_JOBID}" --taskid="${n}" --finish_time="$(date +%s)"
-    elif [[ "${stem}" == "ms" ]]; then 
-        mv $(dirname ${obs_data_ms}) "${base}/${obsnum}"
-    elif [[ "$stem" == 'vis' ]]; then
-        echo "Data downloaded successfully; now run cotter or birli if the data is not already pre-processed."
-        track_task.py finish --jobid="${SLURM_JOBID}" --taskid="${n}" --finish_time="$(date +%s)"
-        track_task.py obs_status --obs_id="${obsnum}" --status='downloaded'
-    elif [[ "$stem" == 'astro' ]]; then 
-        echo "astro delivery mode not yet supported by obs_manta. "
-        track_task.py fail --jobid="${SLURM_JOBID}" --taskid="${n}" --finish_time="$(date +%s)"
+        echo "The mwa_client failed to download data for obsid ${obsid}."
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${SLURM_JOBID}" --taskid="${n}" --finish_time="$(date +%s)"
+        fi
     else
-        echo "No operation available for ${stem} mode for obsid ${obsnum}."
-        track_task.py fail --jobid="${SLURM_JOBID}" --taskid="${n}" --finish_time="$(date +%s)"
+        mv "$(dirname ${obs_data_ms})" "${project_dir}/${obsid}"
     fi
     ((n+=1))
 done

@@ -2,53 +2,40 @@
 
 set -x
 
-obsnum=OBSNUM
-ramcopy=RAMCOPY
+obsinp=OBSINP
+ramcopy=RAMCOPY # Copy the measurement set to RAM for processing? (blank means no)
+project_dir=PROJECT_DIR
+fraction=FRACTION
+ionotest=IONOTEST # Perform ionospheric triage? (blank means no)
 
-# If obsnum is a file, then we are in an array job
-if [[ -f "${obsnum}" ]]; then
-    taskid=${SLURM_ARRAY_TASK_ID}
-    jobid=${SLURM_ARRAY_JOB_ID}
-
-    echo "obsfile ${obsnum}"
-    obsnum=$(sed -n -e "${SLURM_ARRAY_TASK_ID}"p "${obsnum}")
-    echo "autocal obsid ${obsnum}"
-    tmpdir=/tmp/slurm_autocal_${jobid}_${taskid}
+# If obsinp is a file, then we are in an array job
+if [[ -f "${obsinp}" ]]; then
+    taskid="${SLURM_ARRAY_TASK_ID}"
+    jobid="${SLURM_ARRAY_JOB_ID}"
+    obsid="$(sed -n -e ${SLURM_ARRAY_TASK_ID}p ${obsinp})"
+    tmpdir="/tmp/slurm_autocal_${jobid}_${taskid}"
 else
     taskid=1
-    jobid=${SLURM_JOB_ID}
-    tmpdir=/tmp/slurm_autocal_${jobid}
+    jobid="${SLURM_JOB_ID}"
+    obsid="${obsinp}"
 fi
-
-echo "jobid: ${jobid}"
-echo "taskid: ${taskid}"
 
 test_fail() {
-if [[ $1 != 0 ]]; then
-    track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
-    exit "$1"
-fi
+    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
+        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        exit "$1"
+    fi
 }
 
-datadir=DATADIR
 # Setting the reference antenna
-if [[ $obsnum -gt 1201000000 ]] && [[ $obsnum -lt 1201400000 ]]; then
-    refant=8
-elif [[ $obsnum -gt 1300000000 ]] && [[ $obsnum -lt 1342950000 ]]; then
-    refant=0
-elif [[ $obsnum -gt 1342950000 ]] && [[ $obsnum -lt 1425294600 ]]; then
-    refant=8
-elif [[ $obsnum -gt 1425294600 ]] && [[ $obsnum -lt 1436999999 ]]; then
-    refant=0
-elif [[ $obsnum -gt 1451700000 ]] && [[ $obsnum -lt 1451800000 ]]; then # Jan 2026
-    refant=8
-elif [[ $obsnum -ge 1452536120 ]] && [[ $obsnum -le 1452542632 ]]; then # Everything else
-    refant=21
-elif [[ $obsnum -gt 1452542632 ]] || [[ $obsnum -lt 1300000000 ]]; then
-    refant=7
+if [[ "${obsid}" -gt 1201000000 ]] && [[ "${obsid}" -lt 1201400000 ]]; then refant=8
+elif [[ "${obsid}" -gt 1300000000 ]] && [[ "${obsid}" -lt 1342950000 ]]; then refant=0
+elif [[ "${obsid}" -gt 1342950000 ]] && [[ "${obsid}" -lt 1425294600 ]]; then refant=8
+elif [[ "${obsid}" -gt 1425294600 ]] && [[ "${obsid}" -lt 1436999999 ]]; then refant=0
+elif [[ "${obsid}" -gt 1451700000 ]] && [[ "${obsid}" -lt 1451800000 ]]; then refant=8 # Jan 2026
+elif [[ "${obsid}" -ge 1452536120 ]] && [[ "${obsid}" -le 1452542632 ]]; then refant=21
+else refant=7 # Everything else
 fi
-fraction=FRACTION
-sthresh=STHRESH
 
 # GLEAM-X sky model
 catfile="${SOFTBASE}/sky_models/GGSM.txt"
@@ -59,48 +46,46 @@ MWAPATH="${GXMWAPB}"
 # Minimum baseline of 75 lambda (=250m at 88 MHz) for calibration
 minuv=75
 
-# Perform ionospheric triage? (1 means yes, blank means no)
-ion=IONOTEST
-
 # start
-track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
 
-cd "${datadir}/${obsnum}" || exit
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+fi
 
-metafits="${obsnum}.metafits"
+cd "${project_dir}/${obsid}" || exit
+
+metafits="${obsid}.metafits"
 if [[ ! -e ${metafits} ]] || [[ ! -s ${metafits} ]]; then
-    wget -O "${metafits}" http://ws.mwatelescope.org/metadata/fits?obs_id=${obsnum}
+    wget -O "${metafits}" http://ws.mwatelescope.org/metadata/fits?obs_id=${obsid}
     test_fail $?
 fi
 
 # In RAM or here?
-if [[ -n $ramcopy ]]; then
-    mkdir -p $tmpdir
-    cp -rf ${obsnum}.ms $tmpdir
-    mst=$tmpdir/${obsnum}.ms
+if [[ -n "${ramcopy}" ]]; then
+    mkdir -p "${tmpdir}"
+    cp -r "${obsid}.ms" "${tmpdir}"
+    ms="${tmpdir}/${obsid}.ms"
 else
-    mst=${obsnum}.ms
+    ms="${obsid}.ms"
 fi
 
 calibrator=$(pyhead.py -p CALIBSRC "$metafits" | awk '{print $3}' )
 echo "Calibrator is $calibrator"
 
-echo "Running infield calibration for $obsnum"
+echo "Running infield calibration for $obsid"
 RA=$(pyhead.py -p RA "$metafits" | awk '{print $3}' )
 Dec=$(pyhead.py -p DEC "$metafits" | awk '{print $3}' )
 chan=$(pyhead.py -p CENTCHAN "$metafits" | awk '{print $3}' )
 
 # Check whether the phase centre has already changed
 # Calibration will fail if it has, so measurement set must be shifted back to its original position
-current=$(chgcentre "${mst}") 
+current=$(chgcentre "${ms}") 
 
 if [[ $current == *"shift"* ]]; then
     echo "Detected that this measurement set has undergone a denormal shift; this must be undone before calibration."
     coords=$(calc_optimum_pointing.py --metafits "${metafits}")
     echo "Optimally shifting co-ordinates of measurement set to $coords, without zenith shiftback."
-    chgcentre \
-            "${mst}" \
-            ${coords}
+    chgcentre "${ms}" "${coords[@]}"
 else
     echo "Detected that this measurement set has not yet had its phase centre changed. Not shifting."
 fi
@@ -114,15 +99,15 @@ minuvm=$(echo "234 * ${minuv} / ${chan}" | bc -l)
 # Calculate max uvw in metres
 maxuvm=$(echo "390000 / (${chan} + 11)" | bc -l)
 
-if [[ -n $ion ]]; then
+if [[ -n "${ionotest}" ]]; then
     echo "Performing ionospheric triage."
 
-    ntimesteps=`taql "calc count([select distinct(TIME) from ${mst}])"`
+    ntimesteps=`taql "calc count([select distinct(TIME) from ${ms}])"`
     # Break the observation into 3 chunks of ntimesteps/3 timesteps each.
     chunk_size=$(echo "$ntimesteps / 3" | bc)
 
     # Ionospheric triage
-    solutions1="${calmodel%%.txt}_solutions_ts1.bin"
+    solutions1="${obsid}_local_gleam_model_solutions_ts1.bin"
     hyperdrive \
         di-calibrate \
         --max-iterations 500 \
@@ -132,17 +117,17 @@ if [[ -n $ion ]]; then
         --uvw-max 1667lambda \
         --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
         --outputs "${solutions1}" \
-        -d "${mst}" "${obsnum}.metafits" \
-        -s ${calmodel}
+        -d "${ms}" "${obsid}.metafits" \
+        -s "${catfile}"
     
     hyperdrive \
         solutions-plot \
         --ref-tile ${refant} \
         --max-amp 2 \
-        -m ${obsnum}.metafits \
+        -m ${obsid}.metafits \
         "${solutions1}" 
 
-    solutions="${calmodel%%.txt}_solutions_ts2.bin"
+    solutions="${obsid}_local_gleam_model_solutions_ts2.bin"
     hyperdrive \
         di-calibrate \
         --timesteps $(eval echo {$chunk_size..$(echo "2 * $chunk_size - 1" | bc)}) \
@@ -152,17 +137,17 @@ if [[ -n $ion ]]; then
         --uvw-max 1667lambda \
         --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
         --outputs "${solutions}" \
-        -d "${mst}" "${obsnum}.metafits" \
-        -s ${calmodel}
+        -d "${ms}" "${obsid}.metafits" \
+        -s "${catfile}"
 
     hyperdrive \
         solutions-plot \
         --ref-tile ${refant} \
         --max-amp 2 \
-        -m ${obsnum}.metafits \
+        -m ${obsid}.metafits \
         "${solutions}"
 
-    solutions="${calmodel%%.txt}_solutions_ts3.bin"
+    solutions="${obsid}_local_gleam_model_solutions_ts3.bin"
     hyperdrive \
         di-calibrate \
         --timesteps $(eval echo {$(echo "2 * $chunk_size" | bc)..$(echo "$ntimesteps - 1" | bc)}) \
@@ -172,26 +157,26 @@ if [[ -n $ion ]]; then
         --uvw-max 1667lambda \
         --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
         --outputs "${solutions}" \
-        -d "${mst}" "${obsnum}.metafits" \
-        -s ${calmodel}
+        -d "${ms}" "${obsid}.metafits" \
+        -s "${catfile}"
 
     hyperdrive \
         solutions-plot \
         --ref-tile ${refant} \
         --max-amp 2 \
-        -m ${obsnum}.metafits \
+        -m ${obsid}.metafits \
         "${solutions}" 
 
     echo "Ionospheric calibration finished. Creating plots and statistics. "
 
     python ${GXBASE}/gleam_x/bin/aocal_diff.py --metafits="${metafits}" --names --lastsol "${solutions}" "${solutions1}" --refant="${refant}"
     if [[ -n ${GXDBHOST} ]] && [[ -n ${GXDBPORT} ]] && [[ -n ${GXDBUSER} ]] && [[ -n ${GXDBPASS} ]]; then
-        iono_update.py --ionocsv "${obsnum}_ionodiff.csv"
+        iono_update.py --ionocsv "${obsid}_ionodiff.csv"
     fi
 fi
 
 # At the moment, assume that the ionosphere is OK, and derive some real solutions
-solutions="${obsnum}_local_gleam_model_solutions_initial.bin"
+solutions="${obsid}_local_gleam_model_solutions_initial.bin"
 
 # calibrate
 hyperdrive \
@@ -202,22 +187,21 @@ hyperdrive \
     --uvw-max 1667lambda \
     --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
     --outputs "${solutions}" \
-    -d "${mst}" "${obsnum}.metafits" \
-    -s ${catfile}
+    -d "${ms}" "${obsid}.metafits" \
+    -s "${catfile}"
 test_fail $?
 
 # Create a version divided through by the reference antenna, so that all observations have the same relative XY phase, allowing polarisation calibration solutions to be transferred
 # This also sets the cross-terms to zero by default
-aocal_phaseref.py "${solutions}" "${solutions%.bin}_ref.bin" "${refant}" --xy -2.806338586067941065e+01 --dxy -4.426533296449057023e-07  --ms "${obsnum}.ms"
+aocal_phaseref.py "${solutions}" "${solutions%.bin}_ref.bin" "${refant}" --xy -2.806338586067941065e+01 --dxy -4.426533296449057023e-07  --ms "${obsid}.ms"
 
 # plot calibration solutions
 hyperdrive \
     solutions-plot \
     --ref-tile ${refant} \
     --max-amp 2 \
-    -m ${obsnum}.metafits \
-    "${solutions%.bin}_ref.bin" 
-
+    -m ${obsid}.metafits \
+    "${solutions%.bin}_ref.bin"
 
 test_fail $?
 
@@ -229,9 +213,11 @@ if echo "${result}" | grep -q fail; then
     test_fail 1
 fi
 
-if [[ -n $ramcopy ]]; then
-    cp -rf ${mst} ${obsnum}.ms
-    rm -rf $tmpdir
+# Deriving calibration solutions doesn't change the measurement set, so we don't need to move it back to disk even if we copied it to RAM
+if [[ -n "${ramcopy}" ]]; then
+    rm -rf "${tmpdir}"
 fi
 
-track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+fi
