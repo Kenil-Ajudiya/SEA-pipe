@@ -1,42 +1,44 @@
 #! /bin/bash
 
-obsnum=OBSNUM
+set -x
 
-# If obsnum is a file, then we are in an array job
-if [[ -f ${obsnum} ]]; then
-    taskid=${SLURM_ARRAY_TASK_ID}
-    jobid=${SLURM_ARRAY_JOB_ID}
+obsinp=OBSINP
+project_dir=PROJECT_DIR
+debug=DEBUG
 
-    echo "obsfile ${obsnum}"
-    obsnum=$(sed -n -e "${SLURM_ARRAY_TASK_ID}"p "${obsnum}")
-    echo "uvflag obsid ${obsnum}"
+# If obsinp is a file, then we are in an array job
+if [[ -f "${obsinp}" ]]; then
+    taskid="${SLURM_ARRAY_TASK_ID}"
+    jobid="${SLURM_ARRAY_JOB_ID}"
+    obsid="$(sed -n -e "${SLURM_ARRAY_TASK_ID}"p "${obsinp}")"
 else
     taskid=1
     jobid=${SLURM_JOB_ID}
+    obsid="${obsinp}"
 fi
-
-echo "jobid: ${jobid}"
-echo "taskid: ${taskid}"
-
-datadir=DATADIR
-debug=DEBUG
 
 function test_fail {
-if [[ $1 != 0 ]]; then
-    track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
-    exit "$1"
-fi
+    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
+        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        exit "$1"
+    fi
 }
 
-track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+fi
 
-cd "$datadir/${obsnum}" || exit 1
-if [[ -z $debug ]]; then
+cd "${project_dir}/${obsid}" || exit 1
+if [[ -z "${debug}" ]]; then
     column=DATA
 else
     column=CORRECTED_DATA
 fi
 
-ms_flag_by_uvdist.py "${obsnum}.ms" $column -a 
+ms_flag_by_uvdist.py "${obsid}.ms" "${column}" -a 
+test_fail $?
 
-track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+    track_task.py obs_status --obs_id="${obsid}" --status='flagged'
+fi
