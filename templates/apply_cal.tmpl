@@ -45,7 +45,7 @@ if [[ ! -f "${metafits}" ]] || [[ ! -s "${metafits}" ]]; then
     test_fail $?
 fi
 
-if [[ -n $selfcal ]]; then 
+if [[ -n "${selfcal}" ]]; then
     calfile="${project_dir}/${calid}/${calid}_selfsolutions.bin"
     # Checking if there is a gross sidelobe: 
     if [[ ! -f "${obsid}_beamlobes.txt" ]]; then
@@ -53,7 +53,6 @@ if [[ -n $selfcal ]]; then
     else
         echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Already have the beam, not recalculating"
     fi 
-
 
     if [[ $(cat ${obsid}_beamlobes.txt | wc -l ) -eq 1 ]]; then 
         ra_sidelobe=$(cat ${obsid}_beamlobes.txt | awk '{print $2}')
@@ -63,12 +62,12 @@ if [[ -n $selfcal ]]; then
         self="False"
     fi 
 
-    get_mwa_pb_lobes.py ${metafits} -mM > ${obsid}_mainlobes.txt
-    ra_mainlobe=$(cat ${obsid}_mainlobes.txt | awk '{print $2}')
-    dec_mainlobe=$(cat ${obsid}_mainlobes.txt | awk '{print $3}')
+    get_mwa_pb_lobes.py "${metafits}" -mM > '${obsid}_mainlobes.txt'
+    ra_mainlobe="$(cat ${obsid}_mainlobes.txt | awk '{print $2}')"
+    dec_mainlobe="$(cat ${obsid}_mainlobes.txt | awk '{print $3}')"
 
     # Check if crab or cyg is in the main fov
-    ateam_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe})
+    ateam_fov="$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe})"
     if [[ "${ateam_fov}" == "False" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # There is no bright thing in main FOV, no self-cal needed!!"
         self2="False"

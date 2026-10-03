@@ -92,8 +92,6 @@ dec_mainlobe="$(cat ${obsid}_mainlobes.txt | awk '{print $3}')"
 
 # Check if any a-team source is in the main fov
 ateam_fov="$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe})"
-# crab_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe} -s "Crab")
-# cyga_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe} -s "CygA")
 if [[ "${ateam_fov}" == "False" ]]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # There is neither Crab nor CygA in the fov or sidelobe, no self cal needed!"
     self2="False"
@@ -134,7 +132,7 @@ chans="$(pyhead.py -p CHANNELS ${metafits} | awk '{print $3}' | sed 's/,/ /g')"
 chans=($chans)
 
 # Pixel scale
- # At least 4 pix per synth beam for each channel
+# At least 4 pix per synth beam for each channel
 scale="$(echo '${basescale} / ${chan}' | bc -l)"
 
 # Naming convention for output files
@@ -180,7 +178,7 @@ fi
 
 # Check if it made initial images 
 if [[ ! -f "${obsid}_initial-MFS-XX-image.fits" ]]; then
-    echo 'Initial image did not generate! Something probs happened with WSClean'
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # ERROR # Initial image did not generate! Something probs happened with WSClean"
     exit 1
 else
     calibrate \
@@ -194,15 +192,14 @@ else
 
     aocal_plot.py --refant=127 "${obsid}_selfsolutions.bin"
     result=$(check_assign_solutions.py -t "0.5" check "${obsid}_selfsolutions.bin")
-fi 
-
-if echo "${result}" | grep -q fail; then
-    mv "${obsid}_selfsolutions.bin" "${obsid}_selfsolutions_failed.bin"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') # ERROR # FAILED SELF CAL!"
-    exit 1
+    if echo "${result}" | grep -q fail; then
+        mv "${obsid}_selfsolutions.bin" "${obsid}_selfsolutions_failed.bin"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # ERROR # FAILED SELF CAL!"
+        exit 1
+    fi
 fi
 
-# clean up all unnecessary images
+# Clean up all unnecessary images
 rm "${obsid}_initial*.fits"
 
 # Move back the measurement set to the original location if we copied it to RAM
