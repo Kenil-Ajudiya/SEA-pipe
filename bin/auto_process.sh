@@ -215,7 +215,6 @@ process_obsids() {
         echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} Created ObsID list file: ${batch_file} with ${#batch_obsids[@]} obsids."
         if [[ -z "${calid_specified}" ]]; then
             calid="${batch_file}"
-            echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} No calibration ObsID specified. Using the same ObsIDs as the input ObsIDs for calibration."
         fi
 
         if [[ -n "${getdata}" ]]; then
