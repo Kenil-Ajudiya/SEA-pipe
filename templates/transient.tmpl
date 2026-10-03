@@ -6,26 +6,30 @@
 
 set -x
 
-obsnum=OBSNUM
+obsinp=OBSINP
 ramcopy=RAMCOPY
+project_dir=PROJECT_DIR
+debug=DEBUG
 
-# If obsnum is a file, then we are in an array job
-if [[ -f "${obsnum}" ]]; then
+# Which data column to image
+if [[ -n $debug ]]; then
+    datacolumn="CORRECTED_DATA"
+else
+    datacolumn="DATA"
+fi
+
+# If obsinp is a file, then we are in an array job
+if [[ -f "${obsinp}" ]]; then
     taskid="${SLURM_ARRAY_TASK_ID}"
     jobid="${SLURM_ARRAY_JOB_ID}"
-
-    echo "obsfile ${obsnum}"
-    obsnum=$(sed -n -e "${SLURM_ARRAY_TASK_ID}"p "${obsnum}")
-    echo "image obsid ${obsnum}"
-    tmpdir=/tmp/slurm_transient_${jobid}_${taskid}
+    obsid="$(sed -n -e ${SLURM_ARRAY_TASK_ID}p ${obsinp})"
+    tmpdir="/tmp/slurm_transient_${jobid}_${taskid}"
 else
     taskid=1
     jobid="${SLURM_JOB_ID}"
-    tmpdir=/tmp/slurm_image_${jobid}
+    obsid="${obsinp}"
+    tmpdir="/tmp/slurm_transient_${jobid}"
 fi
-
-echo "jobid: ${jobid}"
-echo "taskid: ${taskid}"
 
 function test_fail {
     if [[ $1 != 0 ]]; then
@@ -34,39 +38,34 @@ function test_fail {
     fi
 }
 
-# Set version number
-base=BASEDIR
-debug=DEBUG
-# Which data column to image
-if [[ -n $debug ]]; then
-    datacolumn="CORRECTED_DATA"
-else
-    datacolumn="DATA"
+# Update database
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
 fi
 
-# Update database
-cd "${base}" || exit
-track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+data_dir="${project_dir}/${obsid}"
+cd "${data_dir}" || exit
 
-datadir="${base}/${obsnum}"
-cd "${datadir}" || exit
-
-metafits="${obsnum}.metafits"
+metafits="${obsid}.metafits"
+if [[ ! -f "${metafits}" ]] || [[ ! -s "${metafits}" ]]; then
+    wget -O "${metafits}" "http://ws.mwatelescope.org/metadata/fits?obs_id=${obsid}"
+    test_fail $?
+fi
 
 # Set up telescope-configuration-dependent options
-if [[ $obsnum -lt 1151402936 ]]; then
+if [[ "${obsid}" -lt 1151402936 ]]; then
     telescope="MWA128T"
     basescale=1.1
     imsize=4000
     robust=-1.0
     timeres=4
-elif [[ $obsnum -ge 1151402936 ]] && [[ $obsnum -lt 1191580576 ]]; then
+elif [[ "${obsid}" -ge 1151402936 ]] && [[ "${obsid}" -lt 1191580576 ]]; then
     telescope="MWAHEX"
     basescale=2.0
     imsize=2000
     robust=-2.0
     timeres=8
-elif [[ $obsnum -ge 1191580576 ]]; then
+elif [[ "${obsid}" -ge 1191580576 ]]; then
     telescope="MWALB"
     basescale=0.6
     imsize=8000
@@ -75,7 +74,7 @@ elif [[ $obsnum -ge 1191580576 ]]; then
 fi
 
 # Set up channel-dependent options
-chan="$(pyhead.py -p CENTCHAN "${metafits}" | awk '{print $3}')"
+chan="$(pyhead.py -p CENTCHAN ${metafits} | awk '{print $3}')"
 
 # Settings to support transient imaging / cleaning
 niter=12000
@@ -92,14 +91,12 @@ taper_inner_tukey=50
 # normal imaging mode.
 scale=$(echo "$basescale / $chan * 2" | bc -l)
 
-if [[ -n $ramcopy ]]; then
-    mkdir -p $tmpdir
-    cp -rf ${obsnum}.ms $tmpdir/
-    cp ${metafits} $tmpdir/
-    ms=${tmpdir}/${obsnum}.ms
-    cd $tmpdir
+if [[ -n "${ramcopy}" ]]; then
+    mkdir -p "${tmpdir}"
+    cp -r "${obsid}.ms" "${tmpdir}/"
+    ms="${tmpdir}/${obsid}.ms"
 else
-    ms=${obsnum}.ms
+    ms="${obsid}.ms"
 fi
 
 # Skipping first and last 8 seconds
@@ -115,100 +112,100 @@ if [[ $current == *"shift"* ]]; then
     echo "Detected that this measurement set has already had its phase centre changed. Not shifting."
 else
     # Determine whether to shift the pointing centre to be more optimally-centred on the peak of the primary beam sensitivity
-    coords=$(calc_pointing.py "${metafits}")
+    coords="$(calc_pointing.py ${metafits})"
     echo "Optimally shifting co-ordinates of measurement set to $coords, with zenith shiftback."
-    chgcentre \
-    "${ms}" \
-    "${coords}"
+    chgcentre "${ms}" "${coords}"
     
     # Now shift the pointing centre to point straight up, which approximates minw without making the phase centre rattle around
-    chgcentre \
-    -zenith \
-    -shiftback \
-    "${ms}"
+    chgcentre -zenith -shiftback "${ms}"
 fi
 
-# The number of ${obsnum}_transient-t????-image.fits files should be equal to the number of intervals_out. If not, then run wsclean to make the images. If they exist, then skip this step.
-if [[ "$(ls "${obsnum}"_transient-t????-image.fits 2>/dev/null | wc -l)" -ne $intervals_out ]]; then
-    wsclean -name "${obsnum}_transient" \
-    -abs-mem "${GXMEMORY}" \
-    -nwlayers "${GXNCPUS}" \
-    -data-column "${datacolumn}" \
-    -subtract-model \
-    -pol I \
-    -size $size $size \
-    -minuv-l ${minuv_l} \
-    -taper-inner-tukey ${taper_inner_tukey} \
-    -taper-gaussian ${taper} \
-    -niter $niter \
-    -auto-threshold $auto_threshold \
-    -scale "${scale:0:8}" \
-    -log-time \
-    -no-reorder \
-    -no-update-model-required \
-    -interval $interval_start $interval_stop \
-    -intervals-out $intervals_out \
-    "${ms}"
+# The number of ${obsid}_transient-t????-image.fits files should be equal to the number of intervals_out. If not, then run wsclean to make the images. If they exist, then skip this step.
+if [[ "$(ls "${obsid}"_transient-t????-image.fits 2>/dev/null | wc -l)" -ne $intervals_out ]]; then
+    wsclean \
+        -name "${obsid}_transient" \
+        -abs-mem "${PROGMEMORY}" \
+        -nwlayers "${IMNCPUS}" \
+        -data-column "${datacolumn}" \
+        -subtract-model \
+        -pol I \
+        -size "${size}" "${size}" \
+        -minuv-l "${minuv_l}" \
+        -taper-inner-tukey "${taper_inner_tukey}" \
+        -taper-gaussian "${taper}" \
+        -niter "${niter}" \
+        -auto-threshold "${auto_threshold}" \
+        -scale "${scale:0:8}" \
+        -log-time \
+        -no-reorder \
+        -no-update-model-required \
+        -interval "${interval_start}" "${interval_stop}" \
+        -intervals-out "${intervals_out}" \
+        "${ms}"
 fi
 
-if [[ ! -e "${obsnum}_transient-t0000-image_bkg.fits" ]]; then 
+if [[ ! -f "${obsid}_transient-t0000-image_bkg.fits" ]]; then 
     # Then you need to source-find the data... BANE would be expensive to run more than once, so just do it... once
-    BANE --compress --cores=1 "${obsnum}_transient-t0000-image.fits"
+    BANE --compress --cores=1 "${obsid}_transient-t0000-image.fits"
     test_fail $?
 fi 
 
-
-for file in "${obsnum}"_transient-t????-image.fits; do
+for file in "${obsid}"_transient-t????-image.fits; do
     aegean \
-    --cores ${GXNCPUS}\
-    --maxsummits=2 \
-    --background="${obsnum}"_transient-t0000-image_bkg.fits \
-    --noise="${obsnum}"_transient-t0000-image_rms.fits \
-    --seedclip=5 \
-    --negative \
-    --table="${file},${file%.fits}.reg" \
-    "${file}"
+        --cores "${IMNCPUS}" \
+        --maxsummits=2 \
+        --background="${obsid}"_transient-t0000-image_bkg.fits \
+        --noise="${obsid}"_transient-t0000-image_rms.fits \
+        --seedclip=5 \
+        --negative \
+        --table="${file},${file%.fits}.reg" \
+        "${file}"
 done
 test_fail $?
 
-for file in "${obsnum}"_transient-t????-image_comp.fits; do
+for file in "${obsid}"_transient-t????-image_comp.fits; do
     stilts \
-    tpipe \
-    in="${file}" \
-    cmd="addcol -before island file \\\"${file}\\\"" \
-    cmd="addcol -before island interval_start ${interval_start}" \
-    cmd="addcol -before island interval_stop ${interval_stop}" \
-    cmd="addcol -before island nscans ${ninterval}" \
-    cmd="addcol -before island timeres ${timeres}" \
-    out="${file%.fits}_mod.fits"
+        tpipe \
+        in="${file}" \
+        cmd="addcol -before island file \\\"${file}\\\"" \
+        cmd="addcol -before island interval_start ${interval_start}" \
+        cmd="addcol -before island interval_stop ${interval_stop}" \
+        cmd="addcol -before island nscans ${ninterval}" \
+        cmd="addcol -before island timeres ${timeres}" \
+        out="${file%.fits}_mod.fits"
 done
 
-ls "${obsnum}"_transient-t????-image_comp_mod.fits > concat.list
-stilts tcat in=@concat.list out="${obsnum}_transient_concatenated_table.fits"
+ls "${obsid}"_transient-t????-image_comp_mod.fits > concat.list
+stilts tcat in=@concat.list out="${obsid}_transient_concatenated_table.fits"
+
 stilts tmatch1 \
     matcher="sky" \
     params=120 \
     action="identify" \
     values="ra dec" \
-    in="${obsnum}_transient_concatenated_table.fits" \
-    out="${obsnum}_transient_matched_table.fits"
+    in="${obsid}_transient_concatenated_table.fits" \
+    out="${obsid}_transient_matched_table.fits"
 
 # Make a cube and a standard deviation image
-make_time_cube.py "${obsnum}"_transient
+make_time_cube.py "${obsid}"_transient
 
 # Dump the image and model files into a hdf5 container
-make_imstack.py --start 0 -n "${intervals_out}" "${obsnum}_transient"
+make_imstack.py --start 0 -n "${intervals_out}" "${obsid}_transient"
 
 # Save the flags
-taql "select ctod(TIME), gsum(ntrue(amplitude(DATA[,::3])==0.0)), gsum(ntrue(FLAG[,::3])), gmean(WEIGHT_SPECTRUM[,::3]) from $ms where ANTENNA1 != ANTENNA2 groupby TIME" > "${obsnum}_summary.txt"
+taql "select ctod(TIME), gsum(ntrue(amplitude(DATA[,::3])==0.0)), gsum(ntrue(FLAG[,::3])), gmean(WEIGHT_SPECTRUM[,::3]) from ${ms} where ANTENNA1 != ANTENNA2 groupby TIME" > "${obsid}_summary.txt"
 
-if [[ -n $ramcopy ]]; then
-    mv $tmpdir/* "${datadir}"/
-    rm -rf ${tmpdir}
+# Move back the measurement set to the original location if we copied it to RAM
+if [[ -n "${ramcopy}" ]]; then
+    rm -rf "${data_dir}/${obsid}.ms"
+    mv "${ms}" "${data_dir}/"
+    rm -rf "${tmpdir}"
 fi
 
 # Clean up
-# rm "${obsnum}"_transient-t????-*.fits
-# rm "${obsnum}_transient_concatenated_table.fits"
+rm "${obsid}"_transient-t????-*.fits
+rm "${obsid}_transient_concatenated_table.fits"
 
-track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+fi

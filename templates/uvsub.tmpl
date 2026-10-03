@@ -8,82 +8,88 @@
 
 set -x
 
-obsnum=OBSNUM
+obsinp=OBSINP
 debug=DEBUG
-idg=IDG
+project_dir=PROJECT_DIR
+ramcopy=RAMCOPY
 
-# If obsnum is a file, then we are in an array job
-if [[ -f "${obsnum}" ]]; then
-    taskid=${SLURM_ARRAY_TASK_ID}
-    jobid=${SLURM_ARRAY_JOB_ID}
-
-    echo "obsfile ${obsnum}"
-    obsnum=$(sed -n -e "${SLURM_ARRAY_TASK_ID}"p "${obsnum}")
-    echo "uvsubtract obsid ${obsnum}"
+# If obsinp is a file, then we are in an array job
+if [[ -f "${obsinp}" ]]; then
+    taskid="${SLURM_ARRAY_TASK_ID}"
+    jobid="${SLURM_ARRAY_JOB_ID}"
+    obsid="$(sed -n -e ${SLURM_ARRAY_TASK_ID}p ${obsinp})"
+    tmpdir="/tmp/slurm_uvsub_${jobid}_${taskid}"
 else
     taskid=1
-    jobid=${SLURM_JOB_ID}
+    jobid="${SLURM_JOB_ID}"
+    obsid="${obsinp}"
+    tmpdir="/tmp/slurm_uvsub_${jobid}"
 fi
-
-echo "jobid: ${jobid}"
-echo "taskid: ${taskid}"
 
 function test_fail {
-if [[ $1 != 0 ]]; then
-    track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
-    exit "$1"
-fi
+    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
+        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        exit "$1"
+    fi
 }
 
-datadir=DATADIR
-
 # start
-track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
+fi
 
-cd "${datadir}/${obsnum}" || exit
+cd "${project_dir}/${obsid}" || exit
 
-metafits="${obsnum}.metafits"
-if [[ ! -e ${metafits} ]] || [[ ! -s ${metafits} ]]; then
-    wget -O "${metafits}" "http://ws.mwatelescope.org/metadata/fits?obs_id=${obsnum}"
+metafits="${obsid}.metafits"
+if [[ ! -f "${metafits}" ]] || [[ ! -s "${metafits}" ]]; then
+    wget -O "${metafits}" "http://ws.mwatelescope.org/metadata/fits?obs_id=${obsid}"
     test_fail $?
 fi
 
+if [[ -n "${ramcopy}" ]]; then
+    mkdir -p "${tmpdir}"
+    cp -r "${obsid}.ms" "${tmpdir}/"
+    ms="${tmpdir}/${obsid}.ms"
+    tmpdir="${tmpdir}/" # generate_ateam_subtract_model.py expects the argument to include a trailing slash
+else
+    ms="${obsid}.ms"
+    tmpdir="./" # generate_ateam_subtract_model.py expects the argument to include a trailing slash
+fi
 
 # Check whether the phase centre has already changed
 # Calibration will fail if it has, so measurement set must be shifted back to its original position
-current=$(chgcentre "${obsnum}.ms") 
+current=$(chgcentre "${ms}") 
 
-if [[ $current == *"shift"* ]] 
-then
+if [[ $current == *"shift"* ]]; then
     echo "Detected that this measurement set has undergone a denormal shift; this must be undone before subtrmodel."
     coords=$(calc_pointing.py "${metafits}")
-    echo "Optimally shifting co-ordinates of measurement set to $coords, without zenith shiftback."
-    chgcentre \
-            "${obsnum}.ms" \
-            ${coords}
+    echo "Optimally shifting co-ordinates of measurement set to ${coords}, without zenith shiftback."
+    chgcentre "${ms}" "${coords}"
 else 
     echo "Detected that no shift is needed for this measurement set."
 fi
 
-submodel="${obsnum}.ateam_outlier"
+submodel="${obsid}.ateam_outlier"
 
 if [[ ! -e "${submodel}" ]]; then
     debugoption=
-    if [[ -n $debug ]]; then
+    if [[ -n "${debug}" ]]; then
         debugoption='--corrected-data'
     fi
     echo "Generating model of A-Team sources for uv-subtraction"
-    generate_ateam_subtract_model.py "${obsnum}.metafits" \
+    generate_ateam_subtract_model.py "${obsid}.metafits" \
                                     --mode wsclean \
                                     --min-elevation 0.0 \
                                     --min-flux 5  \
                                     --check-fov \
-                                    $debugoption \
+                                    --ggsm "${SOFTBASE}/sky_models/GGSM_updated.fits" \
+                                    "${debugoption}" \
+                                    --tempdir "${tmpdir}" \
                                     --model-output "${submodel}" 
 fi
 
 if [[ -e "${submodel}" ]]; then
-    echo "Running wslean outlier clean and subtraction... "
+    echo "Running wsclean outlier clean and subtraction... "
     chmod +x "${submodel}"
     ./"${submodel}"
     test_fail $?
@@ -94,4 +100,13 @@ else
     echo "No wsclean script ${submodel} found. Exiting. "
 fi
 
-track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+# Move back the measurement set to the original location if we copied it to RAM
+if [[ -n "${ramcopy}" ]]; then
+    rm -rf "${data_dir}/${obsid}.ms"
+    mv "${ms}" "${data_dir}/"
+    rm -rf "${tmpdir}"
+fi
+
+if [[ "${GXTRACK}" == "track" ]]; then
+    track_task.py finish --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+fi
