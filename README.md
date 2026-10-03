@@ -48,7 +48,7 @@ SEA-pipe is configured through a shell profile. The profile should define the HP
 - `GXHOME`: a writable home directory visible inside the container,
 - `GXCONTAINER`: the path to the Singularity image,
 - `GXCLUSTER`, `GXSTANDARDQ`, `GXACCOUNT`, and copy-job settings for SLURM,
-- `GXABSMEMORY`, `GXMEMORY`, and CPU settings for resource requests,
+- `HYPERNCPUS`, `HYPERMEMORY`, `IMNCPUS`, `IMMEMORY` and `PROGMEMORY` for resource requests,
 - `GXLOG` and `GXSCRIPT` for task logs and generated scripts,
 - `GXMWAPB` and `GXMWALOOKUP` for MWA beam-model data, and
 - `SINGULARITY_BINDPATH` for paths exposed inside the container.

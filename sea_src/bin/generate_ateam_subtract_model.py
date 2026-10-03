@@ -29,7 +29,7 @@ LOCATION = EarthLocation.from_geodetic(
 
 MODEL_MODES = ["subtrmodel", "casa", "casaclean", "count", "wsclean"]
 
-mem = os.getenv("GXMEMORY")
+mem = os.getenv("PROGMEMORY")
 
 # TODO: Make Source use and return proper units
 class Source:
@@ -567,7 +567,7 @@ def attach_units_or_None(param, to_unit) -> Tuple[u.Quantity, None]:
 if __name__ == "__main__":
 
     try:
-        GGSM = f"{os.environ['GXBASE']}/models/GGSM.fits"
+        GGSM = f"{os.environ['SOFTBASE']}/sky_models/GGSM_updated.fits"
     except:
         GGSM = ""
 

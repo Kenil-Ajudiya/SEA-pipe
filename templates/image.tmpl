@@ -25,6 +25,7 @@ else
     taskid=1
     jobid="${SLURM_JOB_ID}"
     obsid="${obsinp}"
+    tmpdir="/tmp/slurm_image_${jobid}"
 fi
 
 function test_fail {
@@ -52,8 +53,11 @@ fi
 data_dir="${project_dir}/${obsid}"
 cd "${data_dir}" || exit
 
-# TODO: replace with find
-metafits="$(ls -t ${obsid}*metafits* | head -1)"
+metafits="${obsid}.metafits"
+if [[ ! -f "${metafits}" ]] || [[ ! -s "${metafits}" ]]; then
+    wget -O "${metafits}" "http://ws.mwatelescope.org/metadata/fits?obs_id=${obsid}"
+    test_fail $?
+fi
 
 # Set up telescope-configuration-dependent options
 if [[ "${obsid}" -lt 1151402936 ]]; then
@@ -157,18 +161,18 @@ fi
 if [[ ! -e "${obsid}_template.fits" ]]; then
     echo "Creating template image for ${obsid}."
     wsclean \
-        -abs-mem ${GXMEMORY} \
+        -abs-mem "${PROGMEMORY}" \
         -mgain 1.0 \
         -nmiter 1 \
         -niter 0 \
-        -name ${obsid}_template \
-        -size ${imsize} ${imsize} \
-        -scale ${scale:0:8} \
+        -name "${obsid}_template" \
+        -size "${imsize}" "${imsize}" \
+        -scale "${scale:0:8}" \
         -pol XX \
-        -data-column ${datacolumn} \
+        -data-column "${datacolumn}" \
         -channel-range 4 5 \
         -interval 4 5 \
-        -nwlayers ${GXNCPUS} \
+        -nwlayers "${IMNCPUS}" \
         "${ms}"
 
     rm "${obsid}_template-dirty.fits"
@@ -198,25 +202,25 @@ done
 set -o pipefail
 # Deep clean (for pipeline)
 wsclean \
-    -abs-mem ${GXMEMORY} \
-    $multiscale \
-    $scalebias \
+    -abs-mem "${PROGMEMORY}" \
+    "${multiscale}" \
+    "${scalebias}" \
     -nmiter 3 \
     -niter 10000000 \
     -reuse-primary-beam \
     -apply-primary-beam \
-    -auto-mask ${msigma} \
-    -auto-threshold ${tsigma} \
-    -name ${obsid}_deep \
-    -size ${imsize} ${imsize} \
-    -scale ${scale:0:8} \
-    -weight briggs ${robust} \
+    -auto-mask "${msigma}" \
+    -auto-threshold "${tsigma}" \
+    -name "${obsid}_deep" \
+    -size "${imsize}" "${imsize}" \
+    -scale "${scale:0:8}" \
+    -weight briggs "${robust}" \
     -pol I \
     -join-channels \
     -channels-out 4 \
     -save-source-list \
     -fit-spectral-pol 2 \
-    -data-column ${datacolumn} \
+    -data-column "${datacolumn}" \
     "${ms}" | tee wsclean.log
 
     # -mwapath ${GXMWAPB} \ # For calculating the primary beam on-the-fly. Replace --reuse-primary-beam with this if you encounter errors with "the primary beam not found" by lookup_jones.py.
@@ -225,6 +229,7 @@ test_fail $?
 
 # Move back the measurement set to the original location if we copied it to RAM
 if [[ -n "${ramcopy}" ]]; then
+    rm -rf "${data_dir}/${obsid}.ms"
     mv "${ms}" "${data_dir}/"
     rm -rf "${tmpdir}"
 fi

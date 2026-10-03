@@ -6,6 +6,12 @@ obsinp=OBSINP
 project_dir=PROJECT_DIR
 debug=DEBUG
 
+if [[ -z "${debug}" ]]; then
+    column=DATA
+else
+    column=CORRECTED_DATA
+fi
+
 # If obsinp is a file, then we are in an array job
 if [[ -f "${obsinp}" ]]; then
     taskid="${SLURM_ARRAY_TASK_ID}"
@@ -29,11 +35,6 @@ if [[ "${GXTRACK}" == "track" ]]; then
 fi
 
 cd "${project_dir}/${obsid}" || exit 1
-if [[ -z "${debug}" ]]; then
-    column=DATA
-else
-    column=CORRECTED_DATA
-fi
 
 ms_flag_by_uvdist.py "${obsid}.ms" "${column}" -a 
 test_fail $?

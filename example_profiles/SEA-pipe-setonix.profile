@@ -30,12 +30,14 @@ export GXCLUSTER="setonix"      # System-wide name of cluster, e.g. "setonix". T
                                 # This is used when submitting tasks 'sbatch --clusters=${GXCLUSTER}', and in track_task.py as a component of the composite key.
 export GXSTANDARDQ="work"       # Slurm queue/partition to submit tasks to, e.g. "work". Available queues can be inspected using 'sinfo' on a system where the slurm schedular is available
 
-# GXNCPUS and GXBASEMEMORY are ignored by the pipeline components that require very less compute resources, e.g., obs_manta.sh, obs_autoflag.sh, etc.
-export GXNCPUS=128              # Number of CPUs of each machine, e.g. 48. For tasks that have a 'core' like option this value is passed.
-export GXBASEMEMORY=200         # Absolute memory a machine should be considered to have in GB, e.g. 60. This value is submitted to slurm via "--mem=${GXBASEMEMORY}"
-export GXMEMORY=180             # Memory limit (in GB) for programs like 'wsclean' to fit within the memory allocation alongside other overheads.
-# It is recommended that this be ~10G smaller than GXABSMEMORY, although there is no technical reason - it could be set otherwise.
-# If you are loading the entire measurement set into memory, then this value should be set to GXBASEMEMORY - (the size of the measurement set, ~10-15G).
+# These configurations are ignored by the pipeline components that require very less compute resources, e.g., obs_manta.sh, obs_autoflag.sh, etc.
+export HYPERNCPUS=32             # Number of CPUs requested for the autocal task. This is passed to slurm via "--cpus-per-task=${HYPERCPUS}".
+export HYPERMEMORY=55           # Memory (in GB) requested for the autocal task. This is passed to slurm via "--mem=${HYPERMEMORY}G".
+export IMNCPUS=64               # Number of CPUs requested for the imaging task. This is passed to slurm via "--cpus-per-task=${IMCPUS}".
+export IMMEMORY=115             # Memory (in GB) requested for the imaging task. This is passed to slurm via "--mem=${IMMEMORY}G".
+export PROGMEMORY=100           # Memory limit (in GB) for programs like 'wsclean' to fit within the memory allocation alongside other overheads.
+# It is recommended that this be ~10G smaller than IMMEMORY, although there is no technical reason - it could be set otherwise.
+# If you are loading the entire measurement set into memory, then this value should be set to IMMEMORY - (the size of the measurement set, ~10-15G).
 
 # Restrict to a single node and single task for now, as none of the components of the pipeline are parallelised across nodes, and each node has enough CPUs to handle the workload.
 # There is a known issue with the Slingshot netowrk on Setonix resulting in MPI failures when MPI spreads its ranks across multiple nodes.
@@ -93,7 +95,7 @@ if [[ -f ${GXSECRETS} ]]; then
 fi
 
 # Check that required variables have a value. This perfoms a simple 'is empty' check
-for var in GXCLUSTER GXSTANDARDQ GXBASEMEMORY GXMEMORY GXNCPUS GXUSER GXCOPYQ GXCOPYM GXLOG GXSCRIPT; do
+for var in GXCLUSTER GXSTANDARDQ HYPERNCPUS HYPERMEMORY IMNCPUS IMMEMORY PROGMEMORY GXUSER GXCOPYQ GXCOPYM GXLOG GXSCRIPT; do
     if [[ -z ${!var} ]]; then
         echo "${var} is currently not configured, please ensure it was a valid value"
         return 1

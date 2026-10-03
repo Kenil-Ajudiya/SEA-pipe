@@ -18,6 +18,7 @@ else
     taskid=1
     jobid="${SLURM_JOB_ID}"
     obsid="${obsinp}"
+    tmpdir="/tmp/slurm_autocal_${jobid}"
 fi
 
 test_fail() {
@@ -38,7 +39,7 @@ else refant=7 # Everything else
 fi
 
 # GLEAM-X sky model
-catfile="${SOFTBASE}/sky_models/GGSM.txt"
+catfile="${SOFTBASE}/sky_models/GGSM_updated.fits"
 
 # MWA beam information
 MWAPATH="${GXMWAPB}"
@@ -52,7 +53,8 @@ if [[ "${GXTRACK}" == "track" ]]; then
     track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
 fi
 
-cd "${project_dir}/${obsid}" || exit
+data_dir="${project_dir}/${obsid}"
+cd "${data_dir}" || exit
 
 metafits="${obsid}.metafits"
 if [[ ! -e ${metafits} ]] || [[ ! -s ${metafits} ]]; then
@@ -213,8 +215,10 @@ if echo "${result}" | grep -q fail; then
     test_fail 1
 fi
 
-# Deriving calibration solutions doesn't change the measurement set, so we don't need to move it back to disk even if we copied it to RAM
+# Move back the measurement set to the original location if we copied it to RAM
 if [[ -n "${ramcopy}" ]]; then
+    rm -rf "${data_dir}/${obsid}.ms"
+    mv "${ms}" "${data_dir}/"
     rm -rf "${tmpdir}"
 fi
 

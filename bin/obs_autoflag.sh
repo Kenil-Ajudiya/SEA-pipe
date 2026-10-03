@@ -122,7 +122,7 @@ submit_job() {
     echo "export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom | tr -d ' ')" >> "${script}_job.sh"
     echo "srun singularity run ${GXCONTAINER} ${script}" >> "${script}_job.sh"
 
-    sub="sbatch --begin=now+2minutes --time=01:00:00 --mem=10G --cpus-per-task=1 ${GXTASKLINE} --clusters=${GXCLUSTER} --account=${GXACCOUNT} --partition=${GXSTANDARDQ} --job-name=autoflag_${obsinp} ${jobarray} --output=${output} --error=${error} ${depend} ${script}_job.sh"
+    sub="sbatch --begin=now --time=01:00:00 --mem=10G --cpus-per-task=5 ${GXTASKLINE} --clusters=${GXCLUSTER} --account=${GXACCOUNT} --partition=${GXSTANDARDQ} --job-name=autoflag_${obsinp} ${jobarray} --output=${output} --error=${error} ${depend} ${script}_job.sh"
 
     if [[ -n "${test}" ]]; then
         echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # TEST #${RST} The SLURM batch script is ${script}"

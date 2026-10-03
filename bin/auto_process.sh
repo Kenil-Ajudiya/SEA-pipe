@@ -23,7 +23,7 @@ Options:
                       Faster, but needs ~3x as much RAM as the size of the measurement set. Disabled by default.
     -z              : Debugging mode: create and use a new CORRECTED_DATA column to store the calibrated data and then image that column instead of the DATA column.
                       This will almost double the size of the measurement set, so use this option only if you have enough disk space. This is useful for debugging and testing.
-    -u              : Subtract out known bright sources using obs_uvsub.sh to avoid contamination from sidelobes.
+    -u              : Subtract out known bright sources using obs_uvsub.sh. This is especially useful to avoid contamination in the transient snapshot cubes.
     -m              : Do sidelobe subtraction using obs_sidelobe_sub.sh to avoid contamination from sidelobes. This is useful mostly at low
                       elevations and at higher frequencies where the sidelobes are above the horizon and as (or more) sensitive than the main lobe.
     -n              : Do (infield) self-calibration using obs_selfcal.sh, especially useful after subtracting the sidelobes, and apply the derived selfcal solutions.
@@ -177,7 +177,6 @@ sanity_checks() {
     fi
 }
 
-
 call_submission_script() {
     local script="$1"
     local other_args="${@:2}" # Capture all arguments after the first one
@@ -196,6 +195,7 @@ call_submission_script() {
         echo -e "${BLD}${BRED}$(date '+%Y-%m-%d %H:%M:%S') # ERROR # ${script} failed with exit code ${exit_code}. Aborting further processing.${RST}" 1>&2
         return ${exit_code}
     fi
+    sleep 1 # Sleep for a second to avoid overwhelming the SLURM scheduler with too many job submissions in a short time.
 }
 
 # This function processes the obsids in batches, submitting jobs to SLURM for each batch using the obs_*.sh scripts.
@@ -258,21 +258,18 @@ process_obsids() {
             call_submission_script "obs_tfilter.sh" || return $?
         fi
 
-        # If we are in batch mode, wait for all jobs in the current batch to finish before moving on.
-        if [[ -n "${batch_mode}" ]]; then
-            if [[ -n "${test}" ]] || ! [[ "${jobid}" =~ ^[0-9]+$ ]]; then
-                echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} It's either test mode or I am debugging. Did not get a numeric job ID, and probably did not submit any jobs either."
-                echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} I am not going to wait for no reason."
-            else
-                echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} Waiting for all jobs in batch ${batch_num} of ${num_batches} to finish before starting the next batch..."
-                echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} Meanwhile, you can watch the status of your jobs using 'squeue --me' or 'squeue -u ${USER}' in another terminal."
-                # Here, squeue displays only the jobs which are either waiting for resources or still running.
-                while squeue --me -h -o "%i" | grep -q ${jobid}; do # If I am able to grep the jobid, then it is still running. If not, then it has finished.
-                    sleep 10
-                done
-            fi
-            depend="" # Reset the dependency for the next batch of jobs.
+        if [[ -n "${test}" ]] || ! [[ "${jobid}" =~ ^[0-9]+$ ]]; then
+            echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} It's either test mode or I am debugging. Did not get a numeric job ID, and probably did not submit any jobs either."
+            echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} I am not going to wait for no reason."
+        else
+            echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} Waiting for all jobs in batch ${batch_num} of ${num_batches} to finish before starting the next batch..."
+            echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # INFO #${RST} Meanwhile, you can watch the status of your jobs using 'squeue --me' or 'squeue -u ${USER}' in another terminal."
+            # Here, squeue displays only the jobs which are either waiting for resources or still running.
+            while squeue --me -h -o "%i" | grep -q ${jobid}; do # If I am able to grep the jobid, then it is still running. If not, then it has finished.
+                sleep 10
+            done
         fi
+        depend="" # Reset the dependency for the next batch of jobs.
     done
 
     echo -e "${BLD}${BGRN}$(date '+%Y-%m-%d %H:%M:%S') # LOG # Completed processing all batches. Below is the accounting information for all submitted jobs:${RST}"

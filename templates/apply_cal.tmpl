@@ -37,6 +37,10 @@ fi
 
 cd "${project_dir}/${obsid}" || exit
 metafits="${obsid}.metafits"
+if [[ ! -f "${metafits}" ]] || [[ ! -s "${metafits}" ]]; then
+    wget -O "${metafits}" "http://ws.mwatelescope.org/metadata/fits?obs_id=${obsid}"
+    test_fail $?
+fi
 
 if [[ -n $selfcal ]]; then 
     calfile="${project_dir}/${calid}/${calid}_selfsolutions.bin"
@@ -80,10 +84,9 @@ else
     calfile="${project_dir}/${calid}/${calid}_local_gleam_model_solutions_initial_ref.bin"
 fi 
 
-if [[ ! -e "${calfile}" ]]; then
-    echo "Could not find calibrator file ${calid}"
-    track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
-    exit 1
+if [[ ! -f "${calfile}" ]]; then
+    echo "Could not find calibrator file ${calfile}"
+    test_fail 1
 fi
 
 echo "Calibration file is ${calfile}"

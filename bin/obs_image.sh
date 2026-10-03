@@ -2,6 +2,7 @@
 
 usage() {
 echo "This script submits SLURM jobbs to image the visibilities using WSClean. It will submit a job-array with one task for each obsid.
+
 Useful links:
     WSClean - https://gitlab.com/aroffringa/wsclean
     WSClean documentation - https://wsclean.readthedocs.io
@@ -136,7 +137,7 @@ submit_job() {
     echo "export FI_CXI_DEFAULT_VNI=$(od -vAn -N4 -tu < /dev/urandom | tr -d ' ')" >> "${script}_job.sh"
     echo "srun singularity run ${GXCONTAINER} ${script}" >> "${script}_job.sh"
 
-    sub="sbatch --begin=now+5minutes ${maxtime} --mem=${GXBASEMEMORY}G --cpus-per-task=${GXNCPUS} ${GXTASKLINE} --clusters=${GXCLUSTER} --account=${GXACCOUNT} --partition=${GXSTANDARDQ} --job-name=image_${obsinp} ${jobarray} --output=${output} --error=${error} ${depend} ${script}_job.sh"
+    sub="sbatch --begin=now ${maxtime} --mem=${IMMEMORY}G --cpus-per-task=${IMNCPUS} ${GXTASKLINE} --clusters=${GXCLUSTER} --account=${GXACCOUNT} --partition=${GXSTANDARDQ} --job-name=image_${obsinp} ${jobarray} --output=${output} --error=${error} ${depend} ${script}_job.sh"
 
     if [[ -n "${test}" ]]; then
         echo -e "${BLD}${BCYN}$(date '+%Y-%m-%d %H:%M:%S') # TEST #${RST} The SLURM batch script is ${script}"
