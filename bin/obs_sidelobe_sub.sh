@@ -29,7 +29,6 @@ Examples:
 Author: Kenil Ajudiya (k.ajudiya@postgrad.curtin.edu.au)"
 }
 
-
 def_colors() {
     # Bright foreground colors
     BRED='\033[91m'           # Bright Red
