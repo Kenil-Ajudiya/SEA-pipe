@@ -237,7 +237,7 @@ if [[ $obsid -gt 1351000000 ]] && [[ $obsid -lt 1353000000 ]]; then
 fi
 
 if [[ -n ${flags} ]]; then
-    echo "Flagging tiles $flags"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Flagging tiles $flags"
     flagantennae ${obsid}.ms $flags
 fi
 

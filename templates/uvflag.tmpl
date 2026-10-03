@@ -23,9 +23,11 @@ else
     obsid="${obsinp}"
 fi
 
-function test_fail {
-    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
-        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+test_fail() {
+    if [[ $1 != 0 ]]; then
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        fi
         exit "$1"
     fi
 }

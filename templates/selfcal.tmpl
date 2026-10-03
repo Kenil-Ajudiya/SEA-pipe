@@ -20,9 +20,11 @@ else
     tmpdir="/tmp/slurm_wsclean_${jobid}"
 fi
 
-function test_fail {
-    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
-        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+test_fail() {
+    if [[ $1 != 0 ]]; then
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        fi
         exit "$1"
     fi
 }
@@ -43,8 +45,8 @@ data_dir="${project_dir}/${obsid}"
 cd "${data_dir}" || exit
 
 # Adding a check to see if there are any selfsolutions already, will not recalculated
-if [[ -e "${obsid}_selfsolutions.bin" ]] || [[ -e "${obsid}_selfsolutions_failed.bin" ]]; then 
-    echo "There is already a selfsolutions file?? Check what you want to do first, but i am exiting without doing anything!!! "
+if [[ -f "${obsid}_selfsolutions.bin" ]] || [[ -f "${obsid}_selfsolutions_failed.bin" ]]; then 
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # ERROR # There is already a selfsolutions file?? Check what you want to do first, but i am exiting without doing anything!!! "
     exit 1
 fi
 
@@ -70,18 +72,17 @@ fi
 taql alter table "${ms}" drop column MODEL_DATA 
 
 # Checking if there is a gross sidelobe: 
-if [[ ! -e "${obsid}_beamlobes.txt" ]]; then
+if [[ ! -f "${obsid}_beamlobes.txt" ]]; then
     get_mwa_pb_lobes.py "${metafits}" -mS > "${obsid}_beamlobes.txt"
 else
-    echo "Already have the beam, not recalculating"
-fi 
-
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Already have the beam, not recalculating"
+fi
 
 if [[ "$(cat ${obsid}_beamlobes.txt | wc -l )" -eq 1 ]]; then 
     ra_sidelobe="$(cat ${obsid}_beamlobes.txt | awk '{print $2}')"
     dec_sidelobe="$(cat ${obsid}_beamlobes.txt | awk '{print $3}')"
 else
-    echo "No major sidelobe, good stuff"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # No major sidelobe, good stuff"
     self="False"
 fi 
 
@@ -94,17 +95,17 @@ ateam_fov="$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe})"
 # crab_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe} -s "Crab")
 # cyga_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe} -s "CygA")
 if [[ "${ateam_fov}" == "False" ]]; then
-    echo "There is neither Crab nor CygA in the fov or sidelobe, no self cal needed!"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # There is neither Crab nor CygA in the fov or sidelobe, no self cal needed!"
     self2="False"
 else
-    echo "Something bright in the main fov, going to do self-cal"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Something bright in the main fov, going to do self-cal"
 fi 
 
 if [[ "${self}" == "False" ]] && [[ "${self2}" == "False" ]]; then 
-    echo "There is no need to do selfcal here!"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # There is no need to do selfcal here!"
     exit 0
 else
-    echo "Either there is a gross sidelobe or Crab/CygA is in the mainlobe, carrying on with selfcal"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Either there is a gross sidelobe or Crab/CygA is in the mainlobe, carrying on with selfcal"
 fi 
 
 # Set up telescope-configuration-dependent options
@@ -156,7 +157,7 @@ multiscale="-multiscale -mgain 0.85 -multiscale-gain 0.15"
 # Set the pipefail so the test_fail does not test for tee
 set -o pipefail
 # shallow clean (for selfcal) 
-if [[ ! -e "${obsid}_initial-MFS-XX-image.fits" ]]; then
+if [[ ! -f "${obsid}_initial-MFS-XX-image.fits" ]]; then
     wsclean \
         -abs-mem "${PROGMEMORY}" \
         "${multiscale}" \
@@ -174,11 +175,11 @@ if [[ ! -e "${obsid}_initial-MFS-XX-image.fits" ]]; then
     
     test_fail $?
 else
-    echo "Already have initial images, not reimaging shallow clean"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Already have initial images, not reimaging shallow clean"
 fi
 
 # Check if it made initial images 
-if [[ ! -e "${obsid}_initial-MFS-XX-image.fits" ]]; then
+if [[ ! -f "${obsid}_initial-MFS-XX-image.fits" ]]; then
     echo 'Initial image did not generate! Something probs happened with WSClean'
     exit 1
 else
@@ -197,7 +198,7 @@ fi
 
 if echo "${result}" | grep -q fail; then
     mv "${obsid}_selfsolutions.bin" "${obsid}_selfsolutions_failed.bin"
-    echo "FAILED SELF CAL!"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # ERROR # FAILED SELF CAL!"
     exit 1
 fi
 

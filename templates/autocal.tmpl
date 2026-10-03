@@ -22,8 +22,10 @@ else
 fi
 
 test_fail() {
-    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
-        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+    if [[ $1 != 0 ]]; then
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        fi
         exit "$1"
     fi
 }
@@ -57,8 +59,8 @@ data_dir="${project_dir}/${obsid}"
 cd "${data_dir}" || exit
 
 metafits="${obsid}.metafits"
-if [[ ! -e ${metafits} ]] || [[ ! -s ${metafits} ]]; then
-    wget -O "${metafits}" http://ws.mwatelescope.org/metadata/fits?obs_id=${obsid}
+if [[ ! -f "${metafits}" ]] || [[ ! -s "${metafits}" ]]; then
+    wget -O "${metafits}" "http://ws.mwatelescope.org/metadata/fits?obs_id=${obsid}"
     test_fail $?
 fi
 
@@ -72,9 +74,9 @@ else
 fi
 
 calibrator=$(pyhead.py -p CALIBSRC "$metafits" | awk '{print $3}' )
-echo "Calibrator is $calibrator"
+echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Calibrator is ${calibrator}"
 
-echo "Running infield calibration for $obsid"
+echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Running infield calibration for ${obsid}"
 RA=$(pyhead.py -p RA "$metafits" | awk '{print $3}' )
 Dec=$(pyhead.py -p DEC "$metafits" | awk '{print $3}' )
 chan=$(pyhead.py -p CENTCHAN "$metafits" | awk '{print $3}' )
@@ -84,12 +86,12 @@ chan=$(pyhead.py -p CENTCHAN "$metafits" | awk '{print $3}' )
 current=$(chgcentre "${ms}") 
 
 if [[ $current == *"shift"* ]]; then
-    echo "Detected that this measurement set has undergone a denormal shift; this must be undone before calibration."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Detected that this measurement set has undergone a denormal shift; this must be undone before calibration."
     coords=$(calc_optimum_pointing.py --metafits "${metafits}")
-    echo "Optimally shifting co-ordinates of measurement set to $coords, without zenith shiftback."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Optimally shifting co-ordinates of measurement set to ${coords}, without zenith shiftback."
     chgcentre "${ms}" "${coords[@]}"
 else
-    echo "Detected that this measurement set has not yet had its phase centre changed. Not shifting."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Detected that this measurement set has not yet had its phase centre changed. Not shifting."
 fi
 
 # uv range for calibration based on GLEAM-based sky model
@@ -102,7 +104,7 @@ minuvm=$(echo "234 * ${minuv} / ${chan}" | bc -l)
 maxuvm=$(echo "390000 / (${chan} + 11)" | bc -l)
 
 if [[ -n "${ionotest}" ]]; then
-    echo "Performing ionospheric triage."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Performing ionospheric triage."
 
     ntimesteps=`taql "calc count([select distinct(TIME) from ${ms}])"`
     # Break the observation into 3 chunks of ntimesteps/3 timesteps each.
@@ -119,14 +121,14 @@ if [[ -n "${ionotest}" ]]; then
         --uvw-max 1667lambda \
         --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
         --outputs "${solutions1}" \
-        -d "${ms}" "${obsid}.metafits" \
+        -d "${ms}" "${metafits}" \
         -s "${catfile}"
     
     hyperdrive \
         solutions-plot \
-        --ref-tile ${refant} \
+        --ref-tile "${refant}" \
         --max-amp 2 \
-        -m ${obsid}.metafits \
+        -m "${metafits}" \
         "${solutions1}" 
 
     solutions="${obsid}_local_gleam_model_solutions_ts2.bin"
@@ -139,14 +141,14 @@ if [[ -n "${ionotest}" ]]; then
         --uvw-max 1667lambda \
         --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
         --outputs "${solutions}" \
-        -d "${ms}" "${obsid}.metafits" \
+        -d "${ms}" "${metafits}" \
         -s "${catfile}"
 
     hyperdrive \
         solutions-plot \
-        --ref-tile ${refant} \
+        --ref-tile "${refant}" \
         --max-amp 2 \
-        -m ${obsid}.metafits \
+        -m "${metafits}" \
         "${solutions}"
 
     solutions="${obsid}_local_gleam_model_solutions_ts3.bin"
@@ -159,20 +161,20 @@ if [[ -n "${ionotest}" ]]; then
         --uvw-max 1667lambda \
         --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
         --outputs "${solutions}" \
-        -d "${ms}" "${obsid}.metafits" \
+        -d "${ms}" "${metafits}" \
         -s "${catfile}"
 
     hyperdrive \
         solutions-plot \
-        --ref-tile ${refant} \
+        --ref-tile "${refant}" \
         --max-amp 2 \
-        -m ${obsid}.metafits \
+        -m "${metafits}" \
         "${solutions}" 
 
     echo "Ionospheric calibration finished. Creating plots and statistics. "
 
-    python ${GXBASE}/gleam_x/bin/aocal_diff.py --metafits="${metafits}" --names --lastsol "${solutions}" "${solutions1}" --refant="${refant}"
-    if [[ -n ${GXDBHOST} ]] && [[ -n ${GXDBPORT} ]] && [[ -n ${GXDBUSER} ]] && [[ -n ${GXDBPASS} ]]; then
+    python "${GXBASE}/gleam_x/bin/aocal_diff.py" --metafits="${metafits}" --names --lastsol "${solutions}" "${solutions1}" --refant="${refant}"
+    if [[ -n "${GXDBHOST}" ]] && [[ -n "${GXDBPORT}" ]] && [[ -n "${GXDBUSER}" ]] && [[ -n "${GXDBPASS}" ]]; then
         iono_update.py --ionocsv "${obsid}_ionodiff.csv"
     fi
 fi
@@ -189,7 +191,7 @@ hyperdrive \
     --uvw-max 1667lambda \
     --beam-file "${MWAPATH}/mwa_full_embedded_element_pattern.h5" \
     --outputs "${solutions}" \
-    -d "${ms}" "${obsid}.metafits" \
+    -d "${ms}" "${metafits}" \
     -s "${catfile}"
 test_fail $?
 
@@ -200,9 +202,9 @@ aocal_phaseref.py "${solutions}" "${solutions%.bin}_ref.bin" "${refant}" --xy -2
 # plot calibration solutions
 hyperdrive \
     solutions-plot \
-    --ref-tile ${refant} \
+    --ref-tile "${refant}" \
     --max-amp 2 \
-    -m ${obsid}.metafits \
+    -m "${metafits}" \
     "${solutions%.bin}_ref.bin"
 
 test_fail $?

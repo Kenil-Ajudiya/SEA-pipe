@@ -31,11 +31,12 @@ for obsid in $obsid_array; do
     # Move the data to ${project_dir}/${obsid}/${obsid}.ms to be consistent with the previous download method.
     obs_data_ms=$(find ${project_dir} -name "${obsid}.ms" -type d) # obs_data_ms will be ${project_dir}/${jobid}/${obsid}.ms if the download was successful, or empty if not.
 
-    if [[ ! -e "${obs_data_ms}" ]]; then
-        echo "The mwa_client failed to download data for obsid ${obsid}."
+    if [[ ! -d "${obs_data_ms}" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # ERROR # The mwa_client failed to download data for obsid ${obsid}."
         if [[ "${GXTRACK}" == "track" ]]; then
             track_task.py fail --jobid="${SLURM_JOBID}" --taskid="${n}" --finish_time="$(date +%s)"
         fi
+        exit 1
     else
         mv "$(dirname ${obs_data_ms})" "${project_dir}/${obsid}"
     fi

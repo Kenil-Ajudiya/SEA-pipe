@@ -26,9 +26,11 @@ else
     tmpdir="/tmp/slurm_uvsub_${jobid}"
 fi
 
-function test_fail {
-    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
-        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+test_fail() {
+    if [[ $1 != 0 ]]; then
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        fi
         exit "$1"
     fi
 }
@@ -38,7 +40,8 @@ if [[ "${GXTRACK}" == "track" ]]; then
     track_task.py start --jobid="${jobid}" --taskid="${taskid}" --start_time="$(date +%s)"
 fi
 
-cd "${project_dir}/${obsid}" || exit
+data_dir="${project_dir}/${obsid}"
+cd "${data_dir}/${obsid}" || exit
 
 metafits="${obsid}.metafits"
 if [[ ! -f "${metafits}" ]] || [[ ! -s "${metafits}" ]]; then
@@ -61,22 +64,22 @@ fi
 current=$(chgcentre "${ms}") 
 
 if [[ $current == *"shift"* ]]; then
-    echo "Detected that this measurement set has undergone a denormal shift; this must be undone before subtrmodel."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Detected that this measurement set has undergone a denormal shift; this must be undone before subtrmodel."
     coords=$(calc_pointing.py "${metafits}")
-    echo "Optimally shifting co-ordinates of measurement set to ${coords}, without zenith shiftback."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Optimally shifting co-ordinates of measurement set to ${coords}, without zenith shiftback."
     chgcentre "${ms}" "${coords}"
 else 
-    echo "Detected that no shift is needed for this measurement set."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Detected that no shift is needed for this measurement set."
 fi
 
 submodel="${obsid}.ateam_outlier"
 
-if [[ ! -e "${submodel}" ]]; then
+if [[ ! -f "${submodel}" ]]; then
     debugoption=
     if [[ -n "${debug}" ]]; then
         debugoption='--corrected-data'
     fi
-    echo "Generating model of A-Team sources for uv-subtraction"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Generating model of A-Team sources for uv-subtraction"
     generate_ateam_subtract_model.py "${obsid}.metafits" \
                                     --mode wsclean \
                                     --min-elevation 0.0 \
@@ -88,16 +91,17 @@ if [[ ! -e "${submodel}" ]]; then
                                     --model-output "${submodel}" 
 fi
 
-if [[ -e "${submodel}" ]]; then
-    echo "Running wsclean outlier clean and subtraction... "
+if [[ -f "${submodel}" ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Running wsclean outlier clean and subtraction..."
     chmod +x "${submodel}"
     ./"${submodel}"
     test_fail $?
 
-    echo "Removing outlier files"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Removing outlier files"
     rm *outlier*fits
 else
-    echo "No wsclean script ${submodel} found. Exiting. "
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # ERROR # No wsclean script ${submodel} found. Exiting."
+    exit 1
 fi
 
 # Move back the measurement set to the original location if we copied it to RAM

@@ -28,9 +28,11 @@ else
     tmpdir="/tmp/slurm_image_${jobid}"
 fi
 
-function test_fail {
-    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
-        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+test_fail() {
+    if [[ $1 != 0 ]]; then
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        fi
         exit "$1"
     fi
 }
@@ -121,20 +123,20 @@ else
     ms="${obsid}.ms"
 fi
 
-if [[ ! -e "${obsid}_mainlobes.txt" ]]; then 
-    get_mwa_pb_lobes.py ${metafits} -mM > ${obsid}_mainlobes.txt
-    ra_mainlobe=$(cat ${obsid}_mainlobes.txt | awk '{print $2}')
-    dec_mainlobe=$(cat ${obsid}_mainlobes.txt | awk '{print $3}')
+if [[ ! -f "${obsid}_mainlobes.txt" ]]; then 
+    get_mwa_pb_lobes.py "${metafits}" -mM > "${obsid}_mainlobes.txt"
+    ra_mainlobe="$(cat ${obsid}_mainlobes.txt | awk '{print $2}')"
+    dec_mainlobe="$(cat ${obsid}_mainlobes.txt | awk '{print $3}')"
 else
-    ra_mainlobe=$(cat ${obsid}_mainlobes.txt | awk '{print $2}')
-    dec_mainlobe=$(cat ${obsid}_mainlobes.txt | awk '{print $3}')
+    ra_mainlobe="$(cat ${obsid}_mainlobes.txt | awk '{print $2}')"
+    dec_mainlobe="$(cat ${obsid}_mainlobes.txt | awk '{print $3}')"
 fi
 
 gal_check="$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe} -g)"
 vira_check="$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe} -s "VirA")"
 
 if [[ "${gal_check}" == "True" ]] || [[ "${vira_check}" == "True" ]]; then 
-    echo "There is either gal plane or VirA in FoV so changing multiscale scale bias" 
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # There is either gal plane or VirA in FoV so changing multiscale scale bias" 
     scalebias="-multiscale-scale-bias 0.7"
 else
     scalebias="-multiscale-scale-bias 0.6"
@@ -144,12 +146,12 @@ fi
 current="$(chgcentre "${ms}")"
 
 if [[ "${current}" == *"shift"* ]]; then
-    echo "Detected that this measurement set has already had its phase centre changed. Not shifting."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Detected that this measurement set has already had its phase centre changed. Not shifting."
 else
     # Determine whether to shift the pointing centre to be more optimally-centred 
     # on the peak of the primary beam sensitivity
     coords="$(calc_pointing.py ${metafits})"
-    echo "Optimally shifting co-ordinates of measurement set to $coords, with zenith shiftback."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Optimally shifting co-ordinates of measurement set to ${coords}, with zenith shiftback."
     chgcentre "${ms}" "${coords}"
 
     # Now shift the pointing centre to point straight up, 
@@ -158,8 +160,8 @@ else
 fi
 
 # Create a template image that has all the same properties as our eventual WSClean image
-if [[ ! -e "${obsid}_template.fits" ]]; then
-    echo "Creating template image for ${obsid}."
+if [[ ! -f "${obsid}_template.fits" ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Creating template image for ${obsid}."
     wsclean \
         -abs-mem "${PROGMEMORY}" \
         -mgain 1.0 \
@@ -178,7 +180,7 @@ if [[ ! -e "${obsid}_template.fits" ]]; then
     rm "${obsid}_template-dirty.fits"
     mv "${obsid}_template-image.fits" "${obsid}_template.fits"
 else
-    echo "Using existing template image for ${obsid}."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Using existing template image for ${obsid}."
 fi
 
 # Hardcoding John's PB script location for now
@@ -191,7 +193,7 @@ for n in {0..3}; do
     j=$((i + 5))
     cend=${chans[$j]}
     for pol in $pols; do 
-        if [[ ! -e "${obsid}_000${n}-${pol}-beam.fits" ]]; then
+        if [[ ! -f "${obsid}_000${n}-${pol}-beam.fits" ]]; then
             lookup_jones.py ${obsid} _template.fits ${obsid}_000${n}- -c $cstart-$cend --wsclean_names
         fi
         ln -s "${obsid}_000${n}-${pol}-beam.fits" "${obsid}_deep-000${n}-beam-${pol}.fits"

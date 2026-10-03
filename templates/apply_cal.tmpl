@@ -24,9 +24,11 @@ if [[ -f "${calid}" ]]; then
     calid=$(sed -n -e "${taskid}"p "${calid}")
 fi
 
-function test_fail {
-    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
-        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+test_fail() {
+    if [[ $1 != 0 ]]; then
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        fi
         exit "$1"
     fi
 }
@@ -36,6 +38,7 @@ if [[ "${GXTRACK}" == "track" ]]; then
 fi
 
 cd "${project_dir}/${obsid}" || exit
+
 metafits="${obsid}.metafits"
 if [[ ! -f "${metafits}" ]] || [[ ! -s "${metafits}" ]]; then
     wget -O "${metafits}" "http://ws.mwatelescope.org/metadata/fits?obs_id=${obsid}"
@@ -45,10 +48,10 @@ fi
 if [[ -n $selfcal ]]; then 
     calfile="${project_dir}/${calid}/${calid}_selfsolutions.bin"
     # Checking if there is a gross sidelobe: 
-    if [[ ! -e "${obsid}_beamlobes.txt" ]]; then
-        get_mwa_pb_lobes.py ${metafits} -mS > ${obsid}_beamlobes.txt
+    if [[ ! -f "${obsid}_beamlobes.txt" ]]; then
+        get_mwa_pb_lobes.py "${metafits}" -mS > "${obsid}_beamlobes.txt"
     else
-        echo "Already have the beam, not recalculating"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Already have the beam, not recalculating"
     fi 
 
 
@@ -56,7 +59,7 @@ if [[ -n $selfcal ]]; then
         ra_sidelobe=$(cat ${obsid}_beamlobes.txt | awk '{print $2}')
         dec_sidelobe=$(cat ${obsid}_beamlobes.txt | awk '{print $3}')
     else
-        echo "No major sidelobe, good stuff"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # No major sidelobe, good stuff"
         self="False"
     fi 
 
@@ -66,30 +69,30 @@ if [[ -n $selfcal ]]; then
 
     # Check if crab or cyg is in the main fov
     ateam_fov=$(check_src_fov.py -p ${ra_mainlobe} ${dec_mainlobe})
-    if [[ "$ateam_fov" == "False" ]]; then
-        echo "There is no bright thing in main FOV, no self-cal needed!!"
+    if [[ "${ateam_fov}" == "False" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # There is no bright thing in main FOV, no self-cal needed!!"
         self2="False"
     else
-        echo "Either some bright A-team is in the FOV, carrying on with selfcal"
-        echo "ateam: $ateam_fov"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Either some bright A-team is in the FOV, carrying on with selfcal"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # ateam: ${ateam_fov}"
     fi 
 
     if [[ "$self" == "False" ]] && [[ "${self2}" == "False" ]]; then 
-        echo "Don't want to apply the selfcal, no need!"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Don't want to apply the selfcal, no need!"
         exit 0
     else
-        echo "Either there is a gross sidelobe or Crab/CygA is in the mainlobe, carrying on with applying the selfcal"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Either there is a gross sidelobe or Crab/CygA is in the mainlobe, carrying on with applying the selfcal"
     fi 
 else
     calfile="${project_dir}/${calid}/${calid}_local_gleam_model_solutions_initial_ref.bin"
 fi 
 
 if [[ ! -f "${calfile}" ]]; then
-    echo "Could not find calibrator file ${calfile}"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # ERROR # Could not find calibrator file ${calfile}"
     test_fail 1
 fi
 
-echo "Calibration file is ${calfile}"
+echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Calibration file is ${calfile}"
 
 if [[ -n "${debug}" ]]; then # If in debugging mode, apply to the CORRECTED_DATA column
     nocopy=

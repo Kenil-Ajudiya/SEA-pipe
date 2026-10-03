@@ -8,7 +8,7 @@ ramcopy=RAMCOPY
 debug=DEBUG
 
 # Which data column to image
-if [[ -n $debug ]]; then
+if [[ -n "${debug}" ]]; then
     datacolumn="CORRECTED_DATA"
 else
     datacolumn="DATA"
@@ -27,9 +27,11 @@ else
     tmpdir="/tmp/slurm_wsclean_${jobid}"
 fi
 
-function test_fail {
-    if [[ $1 != 0 ]] && [[ "${GXTRACK}" == "track" ]]; then
-        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+test_fail() {
+    if [[ $1 != 0 ]]; then
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        fi
         exit "$1"
     fi
 }
@@ -109,18 +111,17 @@ maxuvm="$(echo "390000 / (${chan} + 11)" | bc -l)"
 multiscale="-multiscale -mgain 0.85 -multiscale-gain 0.15"
 
 # Checking if there is a gross sidelobe: 
-get_mwa_pb_lobes.py ${metafits} -mS > ${obsid}_beamlobes.txt
-if [[ $(cat ${obsid}_beamlobes.txt | wc -l ) -eq 1 ]]; then 
-    ra_sidelobe=$(cat ${obsid}_beamlobes.txt | awk '{print $2}')
-    dec_sidelobe=$(cat ${obsid}_beamlobes.txt | awk '{print $3}')
-    fov_beam=$(cat ${obsid}_beamlobes.txt | awk '{print $4}')
+get_mwa_pb_lobes.py "${metafits}" -mS > "${obsid}_beamlobes.txt"
+if [[ "$(cat ${obsid}_beamlobes.txt | wc -l )" -eq 1 ]]; then 
+    ra_sidelobe="$(cat ${obsid}_beamlobes.txt | awk '{print $2}')"
+    dec_sidelobe="$(cat ${obsid}_beamlobes.txt | awk '{print $3}')"
+    fov_beam="$(cat ${obsid}_beamlobes.txt | awk '{print $4}')"
 
-    radec_lobe=$(dd_hms_dms.py ${ra_sidelobe} ${dec_sidelobe} -d "hms")
-    lobe_image_size=$(echo "1.2*${fov_beam}/${scale}" | bc -l)
-    lobe_image_size=${lobe_image_size%.*}
-
+    radec_lobe="$(dd_hms_dms.py ${ra_sidelobe} ${dec_sidelobe} -d "hms")"
+    lobe_image_size="$(echo "1.2*${fov_beam}/${scale}" | bc -l)"
+    lobe_image_size="${lobe_image_size%.*}"
 else
-    echo "No major sidelobe, good stuff"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # No major sidelobe, good stuff"
     exit 0
 fi
 
@@ -129,40 +130,39 @@ chgcentre "${ms}" "${radec_lobe}"
 # Initial shallow clean to populate the model column 
 # Set the pipefail so the test_fail does not test for tee
 set -o pipefail
-if [[ ! -e "${obsid}_sidelobe-MFS-XX-image.fits" ]]; then
+if [[ ! -f "${obsid}_sidelobe-MFS-XX-image.fits" ]]; then
     taql alter table "${ms}" drop column MODEL_DATA
     wsclean \
-            -abs-mem ${PROGMEMORY} \
-            -temp-dir /tmp/slurm_wsclean/${SLURM_JOB_ID}/ \
-            $multiscale \
-            -nmiter 1 \
-            -niter 10000 \
-            -auto-threshold 1 \
-            -stop-negative \
-            -auto-mask 3 \
-            -name ${obsid}_sidelobe \
-            -size ${lobe_image_size} ${lobe_image_size} \
-            -scale ${scale:0:8} \
-            -weight briggs ${robust} \
-            -pol XX,YY,XY,YX \
-            -channels-out 4 \
-            -join-polarizations \
-            -data-column ${datacolumn} \
-            "${ms}" | tee wsclean.log
+        -abs-mem "${PROGMEMORY}" \
+        "${multiscale}" \
+        -nmiter 1 \
+        -niter 10000 \
+        -auto-threshold 1 \
+        -stop-negative \
+        -auto-mask 3 \
+        -name "${obsid}_sidelobe" \
+        -size "${lobe_image_size}" "${lobe_image_size}" \
+        -scale "${scale:0:8}" \
+        -weight briggs "${robust}" \
+        -pol XX,YY,XY,YX \
+        -channels-out 4 \
+        -join-polarizations \
+        -data-column "${datacolumn}" \
+        "${ms}" | tee wsclean.log
     test_fail $?
 fi  
 
-if [[ -e "${obsid}_sidelobe-MFS-XX-image.fits" ]]; then
+if [[ -f "${obsid}_sidelobe-MFS-XX-image.fits" ]]; then
     taql update "${ms}" set "${datacolumn}"="${datacolumn}"-MODEL_DATA
     # Also updating the model column to remove the model of the sidelobe so its not accidentally added later 
     taql alter table "${ms}" drop column MODEL_DATA
-    echo "Have subtracted the model column from the ${datacolumn}, now to change back to original pointing and cleanup"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Have subtracted the model column from the ${datacolumn}, now to change back to original pointing and cleanup"
 
     coords=$(calc_pointing.py "${metafits}")
     chgcentre "${ms}" "${coords}"
     chgcentre -zenith -shiftback "${ms}"
 else 
-    echo "There is no sidelobe image so I haven't subtracted anything because I'm not sure what's wrong" 
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # There is no sidelobe image so I haven't subtracted anything because I'm not sure what's wrong" 
 fi 
 
 # Move back the measurement set to the original location if we copied it to RAM

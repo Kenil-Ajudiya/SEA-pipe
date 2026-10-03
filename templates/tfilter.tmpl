@@ -32,7 +32,7 @@ cd "${project_dir}/${obsid}/" || exit 1
 filtercmds=('space_corr 8 time_corr_gauss_multi 0 time_max 0' 'space_corr 8 stdev 0' 'space_corr 8 spike 0 time_max 0' 'space_corr 8  time_corr_gauss 0 time_max 0' 'time_corr_gauss 0 time_max 0')
 filternames=('tcgm' 'std' 'spike' 'dbtcg' 'tcg')
 cutoffs=('--std --cutoff 7.5' '--std --cutoff 7.5' '--cutoff 7.5' '--std --cutoff 7.5' '--std --cutoff 7.5')
-nfilters=${#filternames[@]}
+nfilters="${#filternames[@]}"
 
 ###### Data required for all filters ######
 # This is to get the light curve peak values later

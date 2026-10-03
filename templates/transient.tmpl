@@ -12,7 +12,7 @@ project_dir=PROJECT_DIR
 debug=DEBUG
 
 # Which data column to image
-if [[ -n $debug ]]; then
+if [[ -n "${debug}" ]]; then
     datacolumn="CORRECTED_DATA"
 else
     datacolumn="DATA"
@@ -31,9 +31,11 @@ else
     tmpdir="/tmp/slurm_transient_${jobid}"
 fi
 
-function test_fail {
+test_fail() {
     if [[ $1 != 0 ]]; then
-        track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        if [[ "${GXTRACK}" == "track" ]]; then
+            track_task.py fail --jobid="${jobid}" --taskid="${taskid}" --finish_time="$(date +%s)"
+        fi
         exit "$1"
     fi
 }
@@ -89,7 +91,7 @@ taper_inner_tukey=50
 # Original 'scale=1amin' was from the IPS version of the code
 # Decreasing the scale to be 2 pixels per BMIN, was originally 4 in
 # normal imaging mode.
-scale=$(echo "$basescale / $chan * 2" | bc -l)
+scale=$(echo "${basescale} / ${chan} * 2" | bc -l)
 
 if [[ -n "${ramcopy}" ]]; then
     mkdir -p "${tmpdir}"
@@ -109,11 +111,11 @@ intervals_out=$((interval_stop-interval_start))
 current=$(chgcentre "${ms}")
 
 if [[ $current == *"shift"* ]]; then
-    echo "Detected that this measurement set has already had its phase centre changed. Not shifting."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Detected that this measurement set has already had its phase centre changed. Not shifting."
 else
     # Determine whether to shift the pointing centre to be more optimally-centred on the peak of the primary beam sensitivity
     coords="$(calc_pointing.py ${metafits})"
-    echo "Optimally shifting co-ordinates of measurement set to $coords, with zenith shiftback."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') # INFO # Optimally shifting co-ordinates of measurement set to $coords, with zenith shiftback."
     chgcentre "${ms}" "${coords}"
     
     # Now shift the pointing centre to point straight up, which approximates minw without making the phase centre rattle around
@@ -142,6 +144,7 @@ if [[ "$(ls "${obsid}"_transient-t????-image.fits 2>/dev/null | wc -l)" -ne $int
         -interval "${interval_start}" "${interval_stop}" \
         -intervals-out "${intervals_out}" \
         "${ms}"
+    test_fail $?
 fi
 
 if [[ ! -f "${obsid}_transient-t0000-image_bkg.fits" ]]; then 
@@ -160,8 +163,9 @@ for file in "${obsid}"_transient-t????-image.fits; do
         --negative \
         --table="${file},${file%.fits}.reg" \
         "${file}"
+
+    test_fail $?
 done
-test_fail $?
 
 for file in "${obsid}"_transient-t????-image_comp.fits; do
     stilts \
@@ -173,10 +177,14 @@ for file in "${obsid}"_transient-t????-image_comp.fits; do
         cmd="addcol -before island nscans ${ninterval}" \
         cmd="addcol -before island timeres ${timeres}" \
         out="${file%.fits}_mod.fits"
+
+    test_fail $?
 done
 
 ls "${obsid}"_transient-t????-image_comp_mod.fits > concat.list
 stilts tcat in=@concat.list out="${obsid}_transient_concatenated_table.fits"
+
+test_fail $?
 
 stilts tmatch1 \
     matcher="sky" \
@@ -186,11 +194,15 @@ stilts tmatch1 \
     in="${obsid}_transient_concatenated_table.fits" \
     out="${obsid}_transient_matched_table.fits"
 
+test_fail $?
+
 # Make a cube and a standard deviation image
 make_time_cube.py "${obsid}"_transient
+test_fail $?
 
 # Dump the image and model files into a hdf5 container
 make_imstack.py --start 0 -n "${intervals_out}" "${obsid}_transient"
+test_fail $?
 
 # Save the flags
 taql "select ctod(TIME), gsum(ntrue(amplitude(DATA[,::3])==0.0)), gsum(ntrue(FLAG[,::3])), gmean(WEIGHT_SPECTRUM[,::3]) from ${ms} where ANTENNA1 != ANTENNA2 groupby TIME" > "${obsid}_summary.txt"
