@@ -359,8 +359,8 @@ main() {
                 test=-t
                 ;;
             ? | : | h)
-            usage
-            ;;
+                usage
+                ;;
         esac
     done
 
